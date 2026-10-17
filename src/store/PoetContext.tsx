@@ -46,6 +46,12 @@ export interface AppState {
    * 带 token 以便重复点击同一地点也能再次触发飞行动画。
    */
   placeDetail: { lng: number; lat: number; token: number; label?: string; modernLabel?: string } | null;
+  /** 全屏模式：隐藏顶栏 / 名录 / 右栏，仅留地图 + 时间轴（保留主要操作按钮） */
+  mapFullscreen: boolean;
+  /** 播放生平轨迹时是否朗读诗人小传 */
+  readBrief: boolean;
+  /** 古韵背景音乐开关 */
+  bgmOn: boolean;
 }
 
 export type AppAction =
@@ -80,7 +86,13 @@ export type AppAction =
   /** 迭代 11：打开「地点访客」面板（记录被点地点的经纬度与可选的标题覆盖） */
   | { type: 'OPEN_PLACE'; lng: number; lat: number; label?: string; modernLabel?: string }
   /** 迭代 11：关闭「地点访客」面板 */
-  | { type: 'CLOSE_PLACE' };
+  | { type: 'CLOSE_PLACE' }
+  /** 迭代 12：进入 / 退出地图全屏模式 */
+  | { type: 'SET_FULLSCREEN'; value: boolean }
+  /** 迭代 12：切换「播放生平轨迹时朗读诗人小传」 */
+  | { type: 'TOGGLE_READ_BRIEF' }
+  /** 迭代 12：切换古韵背景音乐 */
+  | { type: 'TOGGLE_BGM' };
 
 const MAX_COMPARE = 3;
 
@@ -110,6 +122,10 @@ export const initialState: AppState = {
   showLinks: true,
   focus: null,
   placeDetail: null,
+  // 迭代 12：全屏模式默认关闭；朗读与背景音乐默认开启（背景音乐需用户手势后才真正发声）
+  mapFullscreen: false,
+  readBrief: true,
+  bgmOn: true,
 };
 
 /** 依据诗人 id 取当前年份（回退到出生年） */
@@ -273,6 +289,15 @@ function reducer(state: AppState, action: AppAction): AppState {
     // 迭代 11：关闭地点访客面板
     case 'CLOSE_PLACE':
       return { ...state, placeDetail: null };
+    // 迭代 12：地图全屏（隐藏顶栏 / 名录 / 右栏，仅留地图 + 时间轴）
+    case 'SET_FULLSCREEN':
+      return { ...state, mapFullscreen: action.value };
+    // 迭代 12：播放时是否朗读诗人小传（关闭朗读时应立即停声，由组件 effect 处理）
+    case 'TOGGLE_READ_BRIEF':
+      return { ...state, readBrief: !state.readBrief };
+    // 迭代 12：古韵背景音乐
+    case 'TOGGLE_BGM':
+      return { ...state, bgmOn: !state.bgmOn };
     default:
       return state;
   }

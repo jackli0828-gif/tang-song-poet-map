@@ -1048,6 +1048,37 @@ export default function MapCanvas(): JSX.Element {
 
       {/* 缩放控制 */}
       <div className="absolute right-3 top-3 flex flex-col gap-1.5">
+        {/* 迭代 12：地图全屏 / 退出全屏（全屏后仍保留本控件与时间轴的播放按钮） */}
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'SET_FULLSCREEN', value: !state.mapFullscreen })}
+          className={`flex h-8 items-center justify-center rounded border shadow-sm transition ${
+            state.mapFullscreen
+              ? 'border-cinnabar bg-cinnabar px-2 text-paper hover:bg-cinnabar/90'
+              : 'w-8 border-ink-4/50 bg-paper/85 text-ink-2 hover:bg-paper-2'
+          }`}
+          title={
+            state.mapFullscreen
+              ? '退出全屏（也可按 Esc）'
+              : '地图全屏：隐藏名录与右栏，保留播放 / 年份 / 缩放等主要操作'
+          }
+        >
+          {state.mapFullscreen ? '✕ 退出' : '⛶'}
+        </button>
+        {/* 迭代 12：背景音乐入口。全屏模式下顶栏被隐藏，这里保留一个开关，
+            与顶栏按钮同读 state.bgmOn，两者状态天然同步。 */}
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'TOGGLE_BGM' })}
+          className={`flex h-8 w-8 items-center justify-center rounded border shadow-sm transition ${
+            state.bgmOn
+              ? 'border-cinnabar/60 bg-cinnabar/15 text-cinnabar hover:bg-cinnabar/25'
+              : 'border-ink-4/50 bg-paper/85 text-ink-2 hover:bg-paper-2'
+          }`}
+          title={state.bgmOn ? '关闭背景音乐（古琴风）' : '开启背景音乐（古琴风）'}
+        >
+          <span className={state.bgmOn ? '' : 'line-through opacity-60'}>♪</span>
+        </button>
         <button
           type="button"
           onClick={() => zoomBy(1.45)}

@@ -11,6 +11,7 @@ import WorksGallery from './components/WorksGallery';
 import CompareView from './components/CompareView';
 import Legend from './components/Legend';
 import { useHashSync } from './hooks/useHashSync';
+import { useBgm } from './hooks/useBgm';
 
 /** 右侧面板：按视图切换 */
 function RightPanel(): JSX.Element {
@@ -107,34 +108,73 @@ export default function App(): JSX.Element {
   useHashSync();
   // 迭代 4 · 键盘快捷键
   useKeyboardShortcuts(useCallback(() => setGuide('help'), []));
+  // 迭代 12 · 古韵背景音乐（全局常驻；浏览器策略要求用户手势后才真正发声）
+  useBgm(state.bgmOn);
+
+  /* ============================================================
+   * 迭代 12 · 地图全屏模式
+   * 全屏时对整棵应用根元素调用 requestFullscreen，并隐藏顶栏 / 诗人名录 /
+   * 右侧面板，让 main（地图 + 时间轴）独占画面 —— 时间轴上的
+   * 「播放 / 暂停 / 复位 / 速度 / 上一站下一站 / 年份」等主要操作按钮
+   * 全部保留，地图自身的缩放、导出、全屏按钮也照常可用。
+   * 用户按 ESC 退出全屏时，用 fullscreenchange 反向同步状态，避免
+   * 「画面已退出全屏但界面仍以为在全屏」的错位。
+   * ============================================================ */
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (state.mapFullscreen) {
+      if (!document.fullscreenElement) {
+        // 由用户点击触发，满足浏览器的用户手势要求；失败（如 iframe 无权限）则静默
+        el.requestFullscreen?.().catch(() => undefined);
+      }
+    } else if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => undefined);
+    }
+  }, [state.mapFullscreen]);
+
+  useEffect(() => {
+    const onFsChange = (): void => {
+      if (!document.fullscreenElement && state.mapFullscreen) {
+        dispatch({ type: 'SET_FULLSCREEN', value: false });
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, [state.mapFullscreen, dispatch]);
 
   return (
-    <div className="paper-bg flex h-full flex-col overflow-hidden text-ink">
-      <TopBar onOpenHelp={() => setGuide('help')} />
+    <div ref={rootRef} className="paper-bg flex h-full flex-col overflow-hidden text-ink">
+      {/* 迭代 12：全屏模式下隐藏顶栏，把整屏让给地图 */}
+      {!state.mapFullscreen ? <TopBar onOpenHelp={() => setGuide('help')} /> : null}
 
       <div className="flex min-h-0 flex-1">
-        <PoetSidebar />
+        {/* 迭代 12：全屏模式下隐藏诗人名录及其展开把手 */}
+        {!state.mapFullscreen ? <PoetSidebar /> : null}
 
-        {/* 侧栏收起时的展开把手 */}
-        {!state.sidebarOpen ? (
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-            className="shrink-0 border-r border-ink-4/40 bg-paper-2/60 px-1 text-[12px] text-ink-3 transition hover:bg-paper-3"
-            title="展开诗人名录"
-          >
-            <span className="vertical-title mx-auto">名录</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-            className="absolute left-[244px] top-[64px] z-10 -ml-px hidden rounded-r-sm border border-l-0 border-ink-4/40 bg-paper-2 px-1 py-2 text-[11px] text-ink-3 hover:bg-paper-3 lg:block"
-            title="收起诗人名录"
-          >
-            ‹
-          </button>
-        )}
+        {!state.mapFullscreen ? (
+          !state.sidebarOpen ? (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+              className="shrink-0 border-r border-ink-4/40 bg-paper-2/60 px-1 text-[12px] text-ink-3 transition hover:bg-paper-3"
+              title="展开诗人名录"
+            >
+              <span className="vertical-title mx-auto">名录</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+              className="absolute left-[244px] top-[64px] z-10 -ml-px hidden rounded-r-sm border border-l-0 border-ink-4/40 bg-paper-2 px-1 py-2 text-[11px] text-ink-3 hover:bg-paper-3 lg:block"
+              title="收起诗人名录"
+            >
+              ‹
+            </button>
+          )
+        ) : null}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           {/* 迭代 2：地图区加卷轴装裱边框 */}
@@ -147,10 +187,12 @@ export default function App(): JSX.Element {
           <Timeline />
         </main>
 
-        {/* 迭代 3 · 响应式：窄屏收窄右面板，宽屏恢复 400px */}
-        <aside className="h-full w-[320px] shrink-0 border-l border-ink-4/40 bg-paper/60 xl:w-[400px]">
-          <RightPanel />
-        </aside>
+        {/* 迭代 3 · 响应式：窄屏收窄右面板，宽屏恢复 400px；迭代 12：全屏模式下隐藏 */}
+        {!state.mapFullscreen ? (
+          <aside className="h-full w-[320px] shrink-0 border-l border-ink-4/40 bg-paper/60 xl:w-[400px]">
+            <RightPanel />
+          </aside>
+        ) : null}
       </div>
 
       {/* 迭代 9：首屏引导 / 快捷键速查（同一遮罩，两种模式） */}

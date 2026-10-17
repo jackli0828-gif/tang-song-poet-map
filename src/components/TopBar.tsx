@@ -147,8 +147,21 @@ export default function TopBar({ onOpenHelp }: { onOpenHelp: () => void }): JSX.
           同时保留原有的「名录过滤」行为（state.search 仍驱动 PoetSidebar 过滤）。 */}
       <GlobalSearch />
 
-      {/* 迭代 9：操作速查 + 分享链接 */}
+      {/* 迭代 9：操作速查 + 分享链接；迭代 12：古韵背景音乐开关 */}
       <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'TOGGLE_BGM' })}
+          title={state.bgmOn ? '关闭背景音乐（古琴风）' : '开启背景音乐（古琴风）'}
+          aria-label="背景音乐开关"
+          className={`flex h-8 items-center justify-center rounded-sm border px-2 text-[12px] transition ${
+            state.bgmOn
+              ? 'border-cinnabar/60 bg-cinnabar/10 text-cinnabar'
+              : 'border-ink-4/45 bg-paper/70 text-ink-2 hover:bg-paper-3'
+          }`}
+        >
+          ♪ 背景音乐
+        </button>
         <button
           type="button"
           onClick={onOpenHelp}

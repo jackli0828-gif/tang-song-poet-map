@@ -3,6 +3,7 @@ import { useAppDispatch, useAppState } from '../store/PoetContext';
 import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { visitorNamesAt } from '../utils/search';
+import { useSpeechState } from '../hooks/useSpeech';
 
 /**
  * 迭代 6 · 地图作品浮层
@@ -54,6 +55,8 @@ export default function MapWorkPopup({
   const shownYear = Math.round(year);
   // 迭代 11：此地还有多少位「其他」诗人到访（用于浮层底部入口）
   const otherVisitors = Math.max(0, visitorNamesAt(node.lng, node.lat).length - 1);
+  // 迭代 12：作品朗读（与时间轴的「朗读生平」共用同一个语音单例，同一时刻只有一处发声）
+  const { speak, cancelSpeech, speakingId, supported: speechOk } = useSpeechState();
 
   return (
     <div
@@ -153,6 +156,24 @@ export default function MapWorkPopup({
                       >
                         {expanded ? '收起' : '展开全文'}
                       </button>
+                      {/* 迭代 12：朗读此篇作品（再次点击即停止） */}
+                      {speechOk ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (speakingId === w.id) cancelSpeech();
+                            else speak(`《${w.title}》。${w.fullText ?? w.excerpt}`, w.id);
+                          }}
+                          className={`rounded-sm border px-1.5 py-0.5 transition ${
+                            speakingId === w.id
+                              ? 'border-cinnabar bg-cinnabar text-paper'
+                              : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
+                          }`}
+                          title={speakingId === w.id ? '停止朗读' : '朗读此篇作品'}
+                        >
+                          {speakingId === w.id ? '🔊 朗读中' : '🔊 朗读'}
+                        </button>
+                      ) : null}
                       {w.fullText ? null : <span className="text-ink-4">（长篇仅节选）</span>}
                     </div>
                     <p className="mt-1 text-[12.5px] leading-relaxed text-ink-4">【背景】{w.background}</p>

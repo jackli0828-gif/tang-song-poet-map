@@ -1,6 +1,7 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
 import { useTimelinePlayer } from '../hooks/useTimelinePlayer';
+import { useSpeechState } from '../hooks/useSpeech';
 import { EVENT_COLOR, type LifeNode, type PlaySpeed, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { activeNodeIndex } from '../utils/geo';
@@ -141,6 +142,34 @@ export default function Timeline(): JSX.Element {
     [dispatch],
   );
 
+  /**
+   * 迭代 12 · 播放生平轨迹时朗读该诗人的主要生平介绍。
+   *
+   * 依赖刻意只取「播放状态 / 朗读开关 / 诗人 id」三者：
+   * - 依赖不含 year，所以播放中每帧推进年份不会反复重读小传；
+   * - 只有「开始播放」或「切换诗人」这两个真正需要重读的时刻才会触发；
+   * - 暂停 / 播完 / 关掉朗读时立即停声（cancelSpeech）。
+   */
+  const { speak, cancelSpeech, supported: speechOk } = useSpeechState();
+  useEffect(() => {
+    if (!speechOk) return;
+    if (state.playing && state.readBrief) {
+      speak(`${primaryPoet.name}，${primaryPoet.dynasty}代诗人。${primaryPoet.brief}`, 'brief');
+    } else {
+      cancelSpeech();
+    }
+  }, [
+    state.playing,
+    state.readBrief,
+    primaryPoet.id,
+    primaryPoet.name,
+    primaryPoet.dynasty,
+    primaryPoet.brief,
+    speechOk,
+    speak,
+    cancelSpeech,
+  ]);
+
   const others = useMemo(() => selectedPoets.filter((p) => p.id !== primaryPoet.id), [selectedPoets, primaryPoet.id]);
   const mainWorkYears = useWorkYears(primaryPoet);
   const mainSpan = primaryPoet.deathYear - primaryPoet.birthYear || 1;
@@ -185,6 +214,23 @@ export default function Timeline(): JSX.Element {
             </button>
           ))}
         </div>
+
+        {/* 迭代 12：朗读开关 —— 播放生平轨迹时朗读该诗人的主要生平介绍。
+            浏览器不支持 Web Speech 时整块隐藏，避免给出无效按钮。 */}
+        {speechOk ? (
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'TOGGLE_READ_BRIEF' })}
+            className={`h-9 rounded-sm border px-3 text-[13px] transition ${
+              state.readBrief
+                ? 'border-cinnabar bg-cinnabar text-paper'
+                : 'border-ink-4/50 text-ink-2 hover:bg-paper-3'
+            }`}
+            title="播放生平轨迹时，朗读该诗人的主要生平介绍"
+          >
+            🔊 朗读生平
+          </button>
+        ) : null}
 
         {/* 迭代 4：播放时地图自动跟随当前节点，避免「人已走出画面」看不见 */}
         <label className="flex items-center gap-1.5 text-[12px] text-ink-2" title="播放推进到新节点时，若节点移出视野，地图自动平滑归中（不改变缩放）">

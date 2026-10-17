@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useApp, useAppDispatch, useAppState } from '../store/PoetContext';
 import { EVENT_LABEL, type LifeNode, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
+import { useSpeechState } from '../hooks/useSpeech';
 
 interface Row {
   work: Work;
@@ -13,6 +14,8 @@ export default function WorksGallery(): JSX.Element {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { primaryPoet } = useApp();
+  // 迭代 12：作品朗读（与地图浮层、时间轴「朗读生平」共用同一个语音单例）
+  const { speak, cancelSpeech, speakingId, supported: speechOk } = useSpeechState();
 
   // 迭代 4 · 检索筛选：关键词（标题/正文/背景/地点）+ 体裁下拉
   const [keyword, setKeyword] = useState('');
@@ -181,6 +184,26 @@ export default function WorksGallery(): JSX.Element {
                       >
                         {expanded ? '收起' : '展开全文'}
                       </button>
+                      {/* 迭代 12：朗读此篇作品（再次点击即停止）。
+                          需 stopPropagation，否则会触发外层卡片的「回到地图」定位。 */}
+                      {speechOk ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (speakingId === row.work.id) cancelSpeech();
+                            else speak(`《${row.work.title}》。${row.work.fullText ?? row.work.excerpt}`, row.work.id);
+                          }}
+                          className={`rounded-sm border px-1.5 py-0.5 transition ${
+                            speakingId === row.work.id
+                              ? 'border-cinnabar bg-cinnabar text-paper'
+                              : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
+                          }`}
+                          title={speakingId === row.work.id ? '停止朗读' : '朗读此篇作品'}
+                        >
+                          {speakingId === row.work.id ? '🔊 朗读中' : '🔊 朗读'}
+                        </button>
+                      ) : null}
                       <span className="ml-auto text-ink-4">点击卡片回到地图</span>
                     </div>
                   </div>
