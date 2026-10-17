@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
 import { useTimelinePlayer } from '../hooks/useTimelinePlayer';
 import { useSpeechState } from '../hooks/useSpeech';
@@ -144,20 +144,52 @@ export default function Timeline(): JSX.Element {
 
   /**
    * 迭代 12 · 播放生平轨迹时朗读该诗人的主要生平介绍。
+   * 迭代 13 · 修正「被时间轴掐断」的缺陷。
    *
-   * 依赖刻意只取「播放状态 / 朗读开关 / 诗人 id」三者：
-   * - 依赖不含 year，所以播放中每帧推进年份不会反复重读小传；
-   * - 只有「开始播放」或「切换诗人」这两个真正需要重读的时刻才会触发；
-   * - 暂停 / 播完 / 关掉朗读时立即停声（cancelSpeech）。
+   * 原实现的写法是 `if (playing && readBrief) speak(...) else cancelSpeech()`，
+   * 于是播放一旦结束（走到卒年自动 SET_PLAYING false，或用户手动暂停），
+   * 走到 else 分支把朗读掐掉。而轨迹往往几秒就走完、小传朗读却要几十秒，
+   * 表现为「生平介绍刚开了个头就哑了」。
+   *
+   * 现在改为：朗读一旦启动就独立播完，只有三种情况才停止——
+   *   1. 用户关闭「朗读生平」开关；
+   *   2. 切换到别的诗人（自动改读新诗人，speak 内部会先取消上一段）；
+   *   3. 新的朗读请求覆盖（如点击某篇作品的朗读按钮）。
+   * 用 ref 记录「上一刻是否处于播放态」，只在 停→播 的上升沿触发朗读；
+   * 播→停 的下降沿刻意不做任何事，让声音自然读完。
+   *
+   * 依赖同样不含 year，避免播放中每帧推进年份反复重读。
    */
   const { speak, cancelSpeech, supported: speechOk } = useSpeechState();
+  const wasPlayingRef = useRef(false);
+  const poetRef = useRef(primaryPoet.id);
   useEffect(() => {
     if (!speechOk) return;
-    if (state.playing && state.readBrief) {
-      speak(`${primaryPoet.name}，${primaryPoet.dynasty}代诗人。${primaryPoet.brief}`, 'brief');
-    } else {
+
+    // ① 关闭朗读开关：立即停声
+    if (!state.readBrief) {
       cancelSpeech();
+      wasPlayingRef.current = state.playing;
+      poetRef.current = primaryPoet.id;
+      return;
     }
+
+    // ② 切换诗人：改读新诗人的小传
+    if (primaryPoet.id !== poetRef.current) {
+      poetRef.current = primaryPoet.id;
+      if (state.playing) {
+        speak(`${primaryPoet.name}，${primaryPoet.dynasty}代诗人。${primaryPoet.brief}`, 'brief');
+      }
+      wasPlayingRef.current = state.playing;
+      return;
+    }
+
+    // ③ 停→播 上升沿：启动朗读（重新播放即重新介绍一遍）
+    if (state.playing && !wasPlayingRef.current) {
+      speak(`${primaryPoet.name}，${primaryPoet.dynasty}代诗人。${primaryPoet.brief}`, 'brief');
+    }
+    // 播→停 下降沿：什么都不做，朗读继续直到读完
+    wasPlayingRef.current = state.playing;
   }, [
     state.playing,
     state.readBrief,

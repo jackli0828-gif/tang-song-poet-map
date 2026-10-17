@@ -40,6 +40,42 @@ export function speechSupported(): boolean {
   return ensureSynth() !== null;
 }
 
+/* ============================================================
+ * 长文本保活（keep-alive）
+ * ------------------------------------------------------------
+ * Chromium 内核有一个长期存在的缺陷：连续朗读超过约 15 秒后，
+ * speechSynthesis 会被浏览器自行暂停且不再恢复，表现为「读到一半卡住」。
+ * 生平小传（几十字）与长篇作品全文都会超过这个时长。
+ * 变通办法：朗读期间定期执行 pause() → resume()，重置内部计时器。
+ * 仅在「确实正在朗读且未被暂停」时执行，避免与用户行为冲突。
+ * ============================================================ */
+let keepAliveTimer: number | null = null;
+const KEEPALIVE_MS = 9000;
+
+function stopKeepAlive(): void {
+  if (keepAliveTimer !== null) {
+    window.clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
+}
+
+function startKeepAlive(): void {
+  stopKeepAlive();
+  if (typeof window === 'undefined') return;
+  keepAliveTimer = window.setInterval(() => {
+    const s = ensureSynth();
+    // 已经读完或被取消：收拢定时器，避免空转
+    if (!s || !s.speaking) {
+      stopKeepAlive();
+      return;
+    }
+    if (!s.paused) {
+      s.pause();
+      s.resume();
+    }
+  }, KEEPALIVE_MS);
+}
+
 export function speak(text: string, id?: string, opts?: { rate?: number; pitch?: number }): void {
   const s = ensureSynth();
   if (!s) return;
@@ -54,21 +90,25 @@ export function speak(text: string, id?: string, opts?: { rate?: number; pitch?:
       currentId = null;
       notify();
     }
+    stopKeepAlive();
   };
   u.onerror = () => {
     if (currentId === id) {
       currentId = null;
       notify();
     }
+    stopKeepAlive();
   };
   currentId = id ?? null;
   s.speak(u);
+  startKeepAlive();
   notify();
 }
 
 export function cancelSpeech(): void {
   const s = ensureSynth();
   s?.cancel();
+  stopKeepAlive();
   currentId = null;
   notify();
 }
