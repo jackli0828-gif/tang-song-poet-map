@@ -1,0 +1,226 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   唐宋词人轨迹 · 水墨绢帛主题
+   - light 主题：宣纸底色，绝不使用深色底
+   - 字体以宋体 / 楷体为主
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+  --paper: #f5efe1;
+  --paper-2: #efe7d6;
+  --ink: #2b2724;
+  --cinnabar: #a83232;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 宣纸纤维底纹：极淡的斜纹，不喧宾夺主 */
+.paper-bg {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(178, 138, 60, 0.07), transparent 45%),
+    radial-gradient(circle at 82% 78%, rgba(58, 110, 165, 0.06), transparent 45%),
+    repeating-linear-gradient(135deg, rgba(120, 105, 80, 0.035) 0px, rgba(120, 105, 80, 0.035) 1px, transparent 1px, transparent 7px);
+}
+
+/* 竖向排版的标题 */
+.vertical-title {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.22em;
+}
+
+/* 印章 */
+.seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--cinnabar);
+  color: var(--cinnabar);
+  border-radius: 3px;
+  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  line-height: 1.05;
+  padding: 3px 4px;
+  text-align: center;
+  opacity: 0.92;
+}
+
+/* 细滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(110, 102, 91, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(110, 102, 91, 0.32);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 时间轴滑块：朱砂 / 墨 的水墨风 */
+input[type='range'].ink-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range'].ink-range::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(90deg, rgba(43, 39, 36, 0.55), rgba(43, 39, 36, 0.2));
+  border-radius: 999px;
+}
+input[type='range'].ink-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6.5px;
+  border-radius: 50%;
+  background: #f5efe1;
+  border: 2px solid var(--cinnabar);
+  box-shadow: 0 1px 3px rgba(43, 39, 36, 0.3);
+}
+input[type='range'].ink-range::-moz-range-track {
+  height: 3px;
+  background: rgba(43, 39, 36, 0.35);
+  border-radius: 999px;
+}
+input[type='range'].ink-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5efe1;
+  border: 2px solid var(--cinnabar);
+}
+
+/* 节点脉冲（ripple）*/
+.ripple-ring {
+  transform-origin: center;
+  animation: rippleAnim 1.9s ease-out infinite;
+}
+@keyframes rippleAnim {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* 收起 / 展开过渡 */
+.panel-fade {
+  animation: panelFade 0.35s ease-out both;
+}
+@keyframes panelFade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 地图禁止选中文字，提升拖动手感 */
+.map-surface {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+/* ============================================================
+   迭代 2 · 美学强化：卷轴装裱、云纹分隔、方印、竖排题签
+   ============================================================ */
+
+/* 卷轴式装裱：地图区四周一圈淡淡的裱边（内阴影模拟绫绢压边） */
+.scroll-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(154, 145, 134, 0.55),
+    inset 0 0 0 6px rgba(239, 231, 214, 0.75),
+    inset 0 0 22px rgba(43, 39, 36, 0.07);
+}
+
+/* 云纹分隔线：中段实、两端渐隐，用于栏目标题前的小分隔 */
+.rule-cloud {
+  display: inline-block;
+  width: 46px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(168, 50, 50, 0.65) 35%,
+    rgba(168, 50, 50, 0.65) 65%,
+    transparent
+  );
+}
+
+/* 方印（区别于圆角 .seal），用于栏目标题旁的印记 */
+.seal-square {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--cinnabar);
+  color: var(--cinnabar);
+  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  border-radius: 2px;
+  padding: 1px 3px;
+  opacity: 0.85;
+}
+
+/* 竖排题签：侧栏 / 面板可用作竖排小标题 */
+.vertical-sign {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.18em;
+  font-family: 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+}
+
+/* 作品卡悬停：朱砂描边 + 微微抬起，呼应水墨的「落笔」感 */
+.work-card {
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+.work-card:hover {
+  border-color: rgba(168, 50, 50, 0.55);
+  box-shadow: 0 2px 10px rgba(43, 39, 36, 0.09);
+  transform: translateY(-1px);
+}
+
+/* 栏目标题：宋体 + 加宽字距，强化古籍版式感 */
+.section-title {
+  font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+  letter-spacing: 0.14em;
+}
+
+.no-drag {
+  pointer-events: none;
+}
