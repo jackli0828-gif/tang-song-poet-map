@@ -1,5 +1,0 @@
-name = "histary"
-compatibility_date = "2024-09-23"
-
-# 标记为 Pages 项目，让 wrangler 走静态托管而非 esbuild bundle
-pages_build_output_dir = "dist"
