@@ -6,7 +6,7 @@
   "description": "唐宋诗人词人时空轨迹地图 —— 人 · 时间 · 地点 · 作品 一一对应",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && npx wrangler pages deploy dist",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
