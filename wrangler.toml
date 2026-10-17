@@ -1,0 +1,5 @@
+# Cloudflare Pages 静态托管配置
+# 让 `npx wrangler deploy` 以 Pages 静态模式运行（上传 dist/ 目录，不走 esbuild 打包）
+name = "history"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
