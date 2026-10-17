@@ -15,3 +15,6 @@ dist-single/
 .verify/
 src/data.bak/
 src/data.mback/
+
+# 交叉验证中间产物（分块数据 / 订正结果）
+scripts/_xchunks/
