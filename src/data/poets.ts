@@ -18,6 +18,8 @@ import { POETS_T3 } from './poets-t3';
 import { POETS_S1 } from './poets-s1';
 import { POETS_S2 } from './poets-s2';
 import { POETS_S3 } from './poets-s3';
+import { POETS_T4 } from './poets-t4';
+import { POETS_S4 } from './poets-s4';
 import { POETS_X1 } from './poets-x1';
 
 export const POETS: Poet[] = [
@@ -5568,6 +5570,9 @@ export const POETS: Poet[] = [
   ...POETS_S1,
   ...POETS_S2,
   ...POETS_S3,
+  // 辞典补录：唐 114 家 / 宋 205 家（scripts/_cider 批次自动生成）
+  ...POETS_T4,
+  ...POETS_S4,
   // 迭代 13：收录完整性查漏补缺批次（林逋、王诜、李重元）
   ...POETS_X1,
 ];
