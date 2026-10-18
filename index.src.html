@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="唐宋诗人词人时空轨迹地图：人 — 时间 — 地点 — 作品 一一对应" />
+    <!-- 中式印章造型 favicon（inline SVG data URI，不引入二进制文件） -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23F5EFE1'/%3E%3Crect x='3.5' y='3.5' width='25' height='25' rx='3' fill='none' stroke='%23A83232' stroke-width='3'/%3E%3Ctext x='16' y='21' font-family='Songti SC,STSong,SimSun,serif' font-size='16' font-weight='700' text-anchor='middle' fill='%23A83232'%3E%E8%AF%97%3C/text%3E%3C/svg%3E"
+    />
+    <title>唐宋词人轨迹 · 时空诗旅图</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <!--
+      vite 的构建入口（见 vite.config.ts 的 build.rollupOptions.input）。
+      必须走 /src/main.tsx 源码入口，不能指向仓库里预构建的 assets/index-*.js：
+      那样 vite 会把那个旧 bundle 当入口（只 transform 6 个模块），
+      src/data 下的所有数据改动都不会进入产物。
+    -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

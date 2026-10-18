@@ -17,5 +17,11 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      vite 的构建入口（见 vite.config.ts 的 build.rollupOptions.input）。
+      必须走 /src/main.tsx 源码入口，不能指向仓库里预构建的 assets/index-*.js：
+      那样 vite 会把那个旧 bundle 当入口（只 transform 6 个模块），
+      src/data 下的所有数据改动都不会进入产物。
+    -->
   </body>
 </html>
