@@ -13,12 +13,6 @@ export default defineConfig({
     outDir: 'dist',
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
-      // 构建入口固定为 index.src.html（源码入口）。
-      // 根目录 index.html 指向仓库内预构建的 assets/index-*.js，是为了让
-      // Pages 以仓库根目录为源时也能直接打开；若拿它当构建入口，vite 会
-      // 直接打包那个旧 bundle（只 transform 6 个模块），src/data 的数据
-      // 改动将全部丢失。这里显式指定入口，杜绝该问题。
-      input: 'index.src.html',
       // 迭代 3 · 产物组织：把框架与投影库拆成独立 chunk，
       // 便于浏览器并行下载与长效缓存（业务代码更新时不必重下 vendor）。
       output: {
