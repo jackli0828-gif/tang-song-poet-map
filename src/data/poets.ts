@@ -21,6 +21,7 @@ import { POETS_S3 } from './poets-s3';
 import { POETS_T4 } from './poets-t4';
 import { POETS_S4 } from './poets-s4';
 import { POETS_X1 } from './poets-x1';
+import { applyWorksAdd } from './works-add';
 
 export const POETS: Poet[] = [
   /* ======================================================= 唐 · 李白 */
@@ -5577,6 +5578,16 @@ export const POETS: Poet[] = [
   ...POETS_X1,
 ];
 
+/**
+ * 辞典补录·已有作者缺失作品（1202 篇）
+ * ==================================================================
+ * 权威辞典记录了 141 位「项目已收录」作者的更多作品，此前未录入。
+ * 由 scripts/gen-cider-append-works.mjs 生成 src/data/works-add.ts，
+ * 在此统一并入对应时空节点（原辞典未系年者按节点轮转挂载，
+ * background 已注明「系年与地点待考」）。
+ */
+export const WORKS_ADD_COUNT = applyWorksAdd(POETS);
+
 /** id → 诗人 */
 export const POET_MAP: Record<string, Poet> = POETS.reduce(
   (acc, p) => {
@@ -5609,11 +5620,16 @@ export const ALL_WORKS: WorkRef[] = POETS.flatMap((p) =>
   ),
 ).sort((a, b) => a.year - b.year);
 
-/** 数据统计（用于页脚展示） */
+/** 数据统计（用于页脚展示）
+ *  注意 worksAdd 一项不可删除：WORKS_ADD_COUNT 是 applyWorksAdd(POETS) 的
+ *  返回值，若没有任何地方消费它，Rollup 会把整个 works-add 模块连同
+ *  applyWorksAdd 的副作用一起 tree-shake 掉，1200 余篇辞典补录作品将不进
+ *  入产物（esbuild 的校验脚本不做 tree-shake，因此看不出来）。 */
 export const DATA_STATS = {
   poets: POETS.length,
   tang: POETS.filter((p) => p.dynasty === '唐').length,
   song: POETS.filter((p) => p.dynasty === '宋').length,
   nodes: POETS.reduce((s, p) => s + p.nodes.length, 0),
   works: ALL_WORKS.length,
+  worksAdd: WORKS_ADD_COUNT,
 };

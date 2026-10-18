@@ -18,3 +18,7 @@ src/data.mback/
 
 # 交叉验证中间产物（分块数据 / 订正结果）
 scripts/_xchunks/
+
+# 辞典 EPUB 解析出的原始语料与批次中间产物（约 16MB，不入厙；
+# 需要重跑时用 scripts/cider-parse.py 重新解析即可）
+scripts/_cider/
