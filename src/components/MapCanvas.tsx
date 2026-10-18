@@ -829,7 +829,12 @@ export default function MapCanvas(): JSX.Element {
    * 迭代 6 · 地图作品浮层：
    * 锁定节点（点击节点 / 作品墙定位）后，把作品就地呈现在该节点旁。
    * 位置由「节点投影坐标 × 当前变换」换算，并做边界收敛避免浮层被裁掉。
+   * 迭代 13：浮层弹出后固定在视口内，不随地图缩放/平移移动；
+   * 用户可拖拽浮层到任意位置；切换节点时重新计算初始位置。
    */
+  const [popupDrag, setPopupDrag] = useState<{ left: number; top: number } | null>(null);
+  const popupDragRef = useRef<{ startX: number; startY: number; startLeft: number; startTop: number } | null>(null);
+
   const popup = useMemo(() => {
     const lockedId = state.lockedNodeByPoet[primaryPoet.id];
     if (!lockedId) return null;
@@ -837,12 +842,23 @@ export default function MapCanvas(): JSX.Element {
     const node = primaryPoet.nodes[i];
     if (!node) return null;
 
+    // 迭代 13：已拖拽过则保持拖拽位置（不随地图变换移动）
+    if (popupDrag) {
+      return {
+        node,
+        index: i,
+        left: popupDrag.left,
+        top: popupDrag.top,
+        placement: 'down' as 'up' | 'down',
+      };
+    }
+
     const [px, py] = mp.project(node.lng, node.lat);
     const sx = px * transform.k + transform.x;
     const sy = py * transform.k + transform.y;
 
-    const W = 288;
-    const H = 320; // 浮层大致高度，用于判断向上还是向下弹
+    const W = 340;
+    const H = 400; // 浮层大致高度，用于判断向上还是向下弹
     // 默认画在节点右下方；若下方空间不足则翻到上方；左右超出则贴边收敛
     const placeUp = sy + 24 + H > size.h && sy - H - 24 >= 0;
     const left = Math.min(Math.max(sx + 18, 8), Math.max(size.w - W - 8, 8));
@@ -855,7 +871,46 @@ export default function MapCanvas(): JSX.Element {
       top,
       placement: (placeUp ? 'up' : 'down') as 'up' | 'down',
     };
-  }, [state.lockedNodeByPoet, primaryPoet, mp, transform, size]);
+  }, [state.lockedNodeByPoet, primaryPoet, mp, transform, size, popupDrag]);
+
+  /** 迭代 13：浮层拖拽起点（由 MapWorkPopup 的 header onPointerDown 触发） */
+  const onPopupDragStart = useCallback(
+    (e: React.PointerEvent, currentLeft: number, currentTop: number): void => {
+      popupDragRef.current = { startX: e.clientX, startY: e.clientY, startLeft: currentLeft, startTop: currentTop };
+      setPopupDrag({ left: currentLeft, top: currentTop });
+    },
+    [],
+  );
+
+  /** 迭代 13：浮层拖拽中 */
+  const onPopupDragMove = useCallback(
+    (e: React.PointerEvent): void => {
+      const d = popupDragRef.current;
+      if (!d) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      const w = 340;
+      const newLeft = Math.min(Math.max(d.startLeft + dx, 0), Math.max(size.w - w, 0));
+      const newTop = Math.min(Math.max(d.startTop + dy, 0), Math.max(size.h - 80, 0));
+      setPopupDrag({ left: newLeft, top: newTop });
+    },
+    [size],
+  );
+
+  /** 迭代 13：浮层拖拽结束 */
+  const onPopupDragEnd = useCallback((): void => {
+    popupDragRef.current = null;
+  }, []);
+
+  /** 迭代 13：切换节点时重置拖拽位置（让浮层回到新节点的投影位置） */
+  const prevLockedId = useRef<string | null>(null);
+  useEffect(() => {
+    const lockedId = state.lockedNodeByPoet[primaryPoet.id];
+    if (lockedId !== prevLockedId.current) {
+      prevLockedId.current = lockedId;
+      setPopupDrag(null);
+    }
+  }, [state.lockedNodeByPoet, primaryPoet.id]);
 
   /** 节点点击：定位 + 平滑飞行 + 右面板自动展开该地最新作品（迭代 1 · A.1 / B.2） */
   const onPickNode = useCallback(
@@ -1029,6 +1084,9 @@ export default function MapCanvas(): JSX.Element {
             const next = primaryPoet.nodes[popup.index + 1];
             if (next) onPickNode(primaryPoet.id, next);
           }}
+          onDragStart={(e, l, t) => onPopupDragStart(e, l, t)}
+          onDragMove={(e) => onPopupDragMove(e)}
+          onDragEnd={() => onPopupDragEnd()}
         />
       ) : null}
 

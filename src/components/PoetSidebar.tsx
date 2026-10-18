@@ -18,12 +18,12 @@ export default function PoetSidebar(): JSX.Element {
   return (
     <aside
       className={`flex h-full shrink-0 flex-col border-r border-ink-4/40 bg-paper-2 transition-all ${
-        state.sidebarOpen ? 'w-[244px]' : 'w-0 overflow-hidden'
+        state.sidebarOpen ? 'w-[160px]' : 'w-0 overflow-hidden'
       }`}
     >
       <div className="flex items-center justify-between px-3 py-2 text-[13px] text-ink-3">
         <span>
-          诗人词人名录
+          诗人词人
           <span className="ml-1.5 text-[11.5px] text-ink-4">
             {list.length} / {DATA_STATS.poets} 家
           </span>
@@ -49,9 +49,6 @@ export default function PoetSidebar(): JSX.Element {
           const showDynastyHead = !prev || prev.dynasty !== p.dynasty;
           const isPrimary = p.id === state.primaryId;
           const inCompare = state.selectedIds.includes(p.id);
-          const year = yearOf(state, p.id);
-          const idx = activeNodeIndex(p.nodes, year);
-          const node = p.nodes[idx];
           return (
             <div key={p.id}>
               {showDynastyHead ? (
@@ -66,58 +63,32 @@ export default function PoetSidebar(): JSX.Element {
                 </div>
               ) : null}
               <div
-                className={`mb-1.5 rounded-sm border px-2.5 py-2 transition ${
-                isPrimary
-                  ? 'border-cinnabar/70 bg-paper shadow-sm'
-                  : inCompare
-                    ? 'border-ink-4/45 bg-paper'
-                    : 'border-transparent hover:bg-paper-3'
-              }`}
-            >
-              <div className="flex items-center gap-2">
+                className={`mb-1 flex items-center rounded-sm border px-2 py-1 transition ${
+                  isPrimary
+                    ? 'border-cinnabar/70 bg-paper shadow-sm'
+                    : inCompare
+                      ? 'border-ink-4/45 bg-paper'
+                      : 'border-transparent hover:bg-paper-3'
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={inCompare}
                   onChange={() => dispatch({ type: 'TOGGLE_COMPARE', id: p.id })}
-                  className="accent-cinnabar"
+                  className="shrink-0 accent-cinnabar"
                   title="加入对比（最多 3 位）"
                 />
                 <button
                   type="button"
                   onClick={() => dispatch({ type: 'SELECT_POET', id: p.id })}
-                  className="flex min-w-0 flex-1 items-baseline gap-1.5 text-left"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
                 >
-                  <span
-                    className="vertical-title h-[62px] text-[16px] leading-none"
-                    style={{ color: isPrimary ? p.avatarColor : '#4A443C', writingMode: 'vertical-rl' }}
-                  >
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
                     {p.name}
                   </span>
-                  <span className="min-w-0 flex-1 truncate">
-                    {/* 迭代 8：朝代印记 + 生卒，一眼区分唐宋 */}
-                    <span className="flex items-center gap-1">
-                      <span className="seal-square text-[10px]">{p.dynasty}</span>
-                      <span className="text-[12.5px] text-ink-2">
-                        {p.birthYear}—{p.deathYear}
-                      </span>
-                    </span>
-                    <span className="block truncate text-[11.5px] text-ink-4">
-                      {p.courtesy ? `字${p.courtesy}` : ''}
-                      {p.pseudonym ? `　号${p.pseudonym}` : ''}
-                    </span>
-                    {/* 迭代 8：展示节点与作品数量，便于判断内容丰富度 */}
-                    <span className="mt-0.5 block text-[11px] text-ink-4">
-                      {p.nodes.length} 站 · {nodeCount(p)} 篇
-                    </span>
-                    {node ? (
-                      <span className="block truncate text-[11.5px] text-ink-3">
-                        {Math.round(year)} · {node.place}
-                      </span>
-                    ) : null}
-                  </span>
+                  <span className="seal-square shrink-0 text-[10px]">{p.dynasty}</span>
                 </button>
               </div>
-            </div>
             </div>
           );
         })}

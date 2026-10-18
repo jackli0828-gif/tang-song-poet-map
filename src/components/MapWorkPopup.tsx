@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppDispatch, useAppState } from '../store/PoetContext';
 import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
@@ -35,6 +35,10 @@ export interface MapWorkPopupProps {
   hasNext: boolean;
   /** 当前年份（播放时为浮点，展示取整数） */
   year: number;
+  /** 迭代 13：浮层拖拽回调（父组件管理拖拽位置） */
+  onDragStart?: (e: React.PointerEvent, left: number, top: number) => void;
+  onDragMove?: (e: React.PointerEvent) => void;
+  onDragEnd?: () => void;
 }
 
 export default function MapWorkPopup({
@@ -49,6 +53,9 @@ export default function MapWorkPopup({
   hasPrev,
   hasNext,
   year,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
 }: MapWorkPopupProps): JSX.Element {
   const state = useAppState();
   const dispatch = useAppDispatch();
@@ -57,11 +64,31 @@ export default function MapWorkPopup({
   const otherVisitors = Math.max(0, visitorNamesAt(node.lng, node.lat).length - 1);
   // 迭代 12：作品朗读（与时间轴的「朗读生平」共用同一个语音单例，同一时刻只有一处发声）
   const { speak, cancelSpeech, speakingId, supported: speechOk } = useSpeechState();
+  // 迭代 13：拖拽中状态（用于改变 cursor）
+  const [dragging, setDragging] = useState(false);
+
+  // 迭代 13：窗口级 pointermove/pointerup 监听（拖拽浮层）
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: PointerEvent): void => {
+      onDragMove?.(e as unknown as React.PointerEvent);
+    };
+    const onUp = (): void => {
+      setDragging(false);
+      onDragEnd?.();
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [dragging, onDragMove, onDragEnd]);
 
   return (
     <div
       className="absolute z-30 w-[340px] rounded-sm border border-ink-3/50 bg-paper shadow-popup"
-      style={{ left, top }}
+      style={{ left, top, cursor: dragging ? 'grabbing' : 'default' }}
       // 浮层自身拦截事件，避免拖拽地图时误触发节点
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
@@ -76,9 +103,20 @@ export default function MapWorkPopup({
         }
       />
 
-      {/* 头部：人 · 时间 · 地点 */}
-      <div className="flex items-start justify-between gap-2 border-b border-ink-4/30 px-3 py-2">
-        <div className="min-w-0">
+      {/* 头部：人 · 时间 · 地点（迭代 13：可拖拽，cursor: grab） */}
+      <div
+        className="flex items-start justify-between gap-2 border-b border-ink-4/30 px-3 py-2"
+        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+        onPointerDown={(e) => {
+          if (e.button === 0) {
+            e.stopPropagation();
+            setDragging(true);
+            onDragStart?.(e, left, top);
+          }
+        }}
+        title="拖拽移动浮层"
+      >
+        <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-1.5">
             <span className="font-kai text-[19px] text-ink">{node.place}</span>
             <span className="truncate text-[13px] text-ink-4">今{node.modernPlace}</span>
