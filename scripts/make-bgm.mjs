@@ -1,7 +1,9 @@
 /**
  * 生成站点背景音乐：public/bgm.mp3
  * --------------------------------------------------------------
- * 原创古风配乐（古琴拨弦 + 箫声旋律 + 低频衬底），D 宫五声音阶。
+ * 原创**轻快**古风配乐（古琴轻拨 + 竹笛短句 + 弱低音衬底），G 宫五声音阶。
+ * 相比旧版（52 BPM 沉郁古韵）：速度提到 92 BPM、笛声担任主旋律、
+ * 古琴改作短促伴奏点，整体明快跳跃，仍保持「琴声主导」的古韵底色。
  *
  * 为什么自己合成而不是下载现成音乐？
  * 1. 站点是纯离线静态站，且当前构建环境出口受限，无法从 Pixabay 等免费音乐站下载；
@@ -31,20 +33,20 @@ const Mp3Encoder = lamejs.Mp3Encoder ?? lamejs;
 
 /* ============================ 基本参数 ============================ */
 const SR = 44100; // 采样率
-const BPM = 52; // 极缓，取古琴散板的从容感
+const BPM = 92; // 轻快的中速
 const BEAT = 60 / BPM;
 const BARS = 16;
-const BEATS = BARS * 4; // 64 拍 ≈ 73.8 秒
-const TAIL = 2.4; // 尾音余量（秒），用于环绕折叠实现无缝循环
+const BEATS = BARS * 4; // 64 拍 ≈ 42 秒
+const TAIL = 2.0; // 尾音余量（秒），用于环绕折叠实现无缝循环
 const LOOP_N = Math.round(BEATS * BEAT * SR);
 const TAIL_N = Math.round(TAIL * SR);
 const N = LOOP_N + TAIL_N;
 
-// D 宫五声音阶：宫(D) 商(E) 角(F#) 徵(A) 羽(B)，跨三个八度
-// 0:D4 1:E4 2:F#4 3:A4 4:B4 | 5:D5 6:E5 7:F#5 8:A5 9:B5 | 10:D6
-const P = [293.66, 329.63, 369.99, 440.0, 493.88, 587.33, 659.25, 739.99, 880.0, 987.77, 1174.66];
-// 低音区（古琴常用音域）：-1:D3 -2:E3 -3:F#3 -4:A3 -5:B3
-const LOW = [146.83, 164.81, 185.0, 220.0, 246.94];
+// G 宫五声音阶：宫(G) 商(A) 角(B) 徵(D) 羽(E)，跨三个八度
+//  0:G4   1:A4   2:B4   3:D5   4:E5  |  5:G5   6:A5   7:B5   8:D6   9:E6 | 10:G6
+const P = [392.0, 440.0, 493.88, 587.33, 659.25, 783.99, 880.0, 987.77, 1174.66, 1318.5, 1567.98];
+// 低音区（古琴常用音域）：-1:G3 -2:A3 -3:B3 -4:D4 -5:E4
+const LOW = [196.0, 220.0, 246.94, 293.66, 329.63];
 
 // 固定种子的伪随机，保证每次生成结果完全一致（可复现）
 let seed = 20261018;
@@ -60,26 +62,26 @@ const buf = new Float32Array(N);
 
 /* ============================ 乐器音色 ============================ */
 
-/** 古琴拨弦：多分音叠加 + 快起慢落的指数包络，模拟拨弦后的余韵 */
+/** 古琴拨弦（轻快版）：快起快收，短促干净，带一点「挑」的亮色 */
 function addPluck(t0, deg, dur, vel) {
   const start = Math.round(t0 * SR);
   const len = Math.min(Math.round(dur * SR), N - start);
   if (len <= 0) return;
   const f = freqOf(deg);
   const partials = [1, 2, 3, 4.18];
-  const amps = [1, 0.4, 0.2, 0.1];
+  const amps = [1, 0.35, 0.15, 0.06];
   for (let i = 0; i < len; i++) {
     const t = i / SR;
-    const env = Math.exp(-t * 2.4) * (1 - Math.exp(-t * 300));
+    const env = Math.exp(-t * 3.2) * (1 - Math.exp(-t * 400));
     let s = 0;
     for (let p = 0; p < partials.length; p++) {
       s += amps[p] * Math.sin(2 * Math.PI * f * partials[p] * t + 0.55 * p);
     }
-    buf[start + i] += vel * 0.15 * env * s;
+    buf[start + i] += vel * 0.13 * env * s;
   }
 }
 
-/** 箫：正弦为主 + 微弱二次谐波，慢起慢收，带揉音与气声 */
+/** 竹笛：正弦为主 + 二次谐波，短起短收，带轻揉音与气声 */
 function addFlute(t0, deg, dur, vel) {
   const start = Math.round(t0 * SR);
   const len = Math.min(Math.round(dur * SR), N - start);
@@ -87,14 +89,14 @@ function addFlute(t0, deg, dur, vel) {
   const f = freqOf(deg);
   for (let i = 0; i < len; i++) {
     const t = i / SR;
-    const atk = 1 - Math.exp(-t * 8);
-    const rel = 1 - Math.exp(-Math.max(0, dur - t) * 6.5);
+    const atk = 1 - Math.exp(-t * 22);
+    const rel = 1 - Math.exp(-Math.max(0, dur - t) * 9);
     const env = Math.min(atk, rel);
-    const vib = 1 + 0.0045 * Math.sin(2 * Math.PI * 4.6 * t);
+    const vib = 1 + 0.005 * Math.sin(2 * Math.PI * 5.5 * t);
     const s =
-      Math.sin(2 * Math.PI * f * vib * t) + 0.15 * Math.sin(2 * Math.PI * f * 2 * vib * t);
-    const breath = (rnd() - 0.5) * 0.06 * env; // 吹奏气声
-    buf[start + i] += vel * 0.12 * env * (s + breath);
+      Math.sin(2 * Math.PI * f * vib * t) + 0.2 * Math.sin(2 * Math.PI * f * 2 * vib * t);
+    const breath = (rnd() - 0.5) * 0.05 * env; // 吹奏气声
+    buf[start + i] += vel * 0.16 * env * (s + breath);
   }
 }
 
@@ -108,7 +110,7 @@ function addDrone(freq, amp) {
 }
 
 /* ============================ 混响（Freeverb 简化版） ============================ */
-function reverb(input, wet = 0.32) {
+function reverb(input, wet = 0.3) {
   const combs = [1557, 1617, 1491, 1422, 1277, 1356].map((d) => ({
     b: new Float32Array(d),
     i: 0,
@@ -139,71 +141,108 @@ function reverb(input, wet = 0.32) {
 
 /* ============================ 编曲 ============================ */
 
-// 箫的主题句（4 小节 = 16 拍）：[起始拍, 音级, 时值]
+// 竹笛的主题句（4 小节 = 16 拍）：短句为主，跳跃、上行，明亮
 const PHRASE = [
-  [0.0, 7, 1.5],
-  [2.0, 5, 1.0],
-  [3.0, 6, 1.0],
-  [4.0, 5, 1.0],
-  [5.0, 3, 2.0],
-  [8.0, 6, 1.0],
-  [9.0, 7, 1.5],
-  [11.0, 5, 1.0],
-  [12.0, 5, 1.0],
-  [13.0, 4, 1.0],
-  [14.0, 5, 2.0],
+  [0.0, 5, 0.5],
+  [0.5, 7, 0.5],
+  [1.0, 9, 0.5],
+  [1.5, 8, 1.0],
+  [2.0, 6, 0.5],
+  [2.5, 7, 0.5],
+  [3.0, 5, 1.0],
+  [4.0, 3, 0.5],
+  [4.5, 5, 0.5],
+  [5.0, 7, 0.5],
+  [5.5, 6, 1.0],
+  [6.0, 5, 0.5],
+  [6.5, 4, 0.5],
+  [7.0, 3, 1.5],
+  [8.0, 7, 0.5],
+  [8.5, 9, 0.5],
+  [9.0, 10, 0.5],
+  [9.5, 9, 0.5],
+  [10.0, 8, 1.0],
+  [11.0, 6, 0.5],
+  [11.5, 8, 0.5],
+  [12.0, 7, 0.5],
+  [12.5, 5, 0.5],
+  [13.0, 6, 0.5],
+  [13.5, 7, 1.0],
+  [14.0, 5, 0.5],
+  [14.5, 4, 0.5],
+  [15.0, 3, 1.0],
 ];
 
-// 古琴的织体（4 小节）：[起始拍, 音级(负=低音区), 时值]
+// 古琴的伴奏织体（4 小节）：低音区为主，短促点，轻快跳跃
 const PLUCKS = [
-  [0.0, 0, 3.0],
-  [1.0, -1, 2.6],
-  [2.5, 3, 3.0],
-  [4.0, -3, 3.0],
-  [5.0, 2, 2.6],
-  [6.5, 0, 3.0],
-  [8.0, -2, 3.0],
-  [9.0, 3, 2.6],
-  [10.5, 1, 3.0],
-  [12.0, -1, 3.0],
-  [13.0, 4, 2.6],
-  [14.5, 3, 3.0],
+  [0.0, 0, 0.6],
+  [0.5, -1, 0.5],
+  [1.0, -2, 0.6],
+  [1.5, 1, 0.5],
+  [2.0, -1, 0.5],
+  [2.5, 0, 0.6],
+  [3.0, -3, 0.5],
+  [3.5, -1, 0.5],
+  [4.0, -2, 0.6],
+  [4.5, -1, 0.5],
+  [5.0, 0, 0.5],
+  [5.5, 2, 0.5],
+  [6.0, -2, 0.6],
+  [6.5, -1, 0.5],
+  [7.0, 0, 0.6],
+  [7.5, 1, 0.5],
+  [8.0, -3, 0.6],
+  [8.5, -2, 0.5],
+  [9.0, -1, 0.5],
+  [9.5, 0, 0.6],
+  [10.0, -2, 0.5],
+  [10.5, -1, 0.6],
+  [11.0, -3, 0.5],
+  [11.5, -1, 0.5],
+  [12.0, 0, 0.6],
+  [12.5, 1, 0.5],
+  [13.0, -2, 0.5],
+  [13.5, -1, 0.6],
+  [14.0, 0, 0.5],
+  [14.5, 2, 0.5],
+  [15.0, -1, 0.6],
+  [15.5, 0, 0.5],
 ];
 
 // 主题句重复 4 次构成 16 小节；每遍做不同处理，避免机械重复：
-// ① 呈示 ② 删减留白 ③ 变奏移位 ④ 收束
+// ① 全奏 ② 稀疏留白 ③ 高八度变奏 ④ 收束
 const VARIANTS = [
-  { drop: 0.0, shift: 0, gain: 1.0 },
-  { drop: 0.28, shift: 0, gain: 0.85 },
-  { drop: 0.1, shift: 1, gain: 0.9 },
-  { drop: 0.35, shift: 0, gain: 0.8 },
+  { drop: 0.05, shift: 0, gain: 1.0 },
+  { drop: 0.3, shift: 0, gain: 0.85 },
+  { drop: 0.1, shift: 2, gain: 0.9 },
+  { drop: 0.4, shift: 0, gain: 0.7 },
 ];
 
 for (let rep = 0; rep < 4; rep++) {
   const v = VARIANTS[rep];
   const off = rep * 16 * BEAT;
 
-  // 箫：主题句
+  // 竹笛：主题句
   for (const [b, deg, d] of PHRASE) {
     if (rnd() < v.drop) continue; // 按比例留白
-    const jitter = (rnd() - 0.5) * 0.06; // 轻微的人性化时值浮动
+    const jitter = (rnd() - 0.5) * 0.04; // 轻微的人性化时值浮动
     addFlute(off + b * BEAT, Math.min(10, Math.max(0, deg + v.shift)), d * BEAT * (1 + jitter), v.gain);
   }
 
-  // 古琴：织体（后半段逐渐稀疏，形成收束感）
-  const sparse = rep >= 2 ? 0.3 : 0.12;
+  // 古琴：伴奏（短促，最后一遍逐渐稀疏形成收束感）
+  const sparse = rep === 3 ? 0.35 : rep === 2 ? 0.18 : 0.1;
   for (const [b, deg, d] of PLUCKS) {
     if (rnd() < sparse) continue;
-    addPluck(off + b * BEAT, deg, d, 0.9 + (rnd() - 0.5) * 0.25);
+    addPluck(off + b * BEAT, deg, d * BEAT, 0.85 + (rnd() - 0.5) * 0.25);
   }
 }
 
-// 低频衬底：D2 + A2，音量极低，只作空间铺垫
-addDrone(73.42, 0.05);
-addDrone(110.0, 0.022);
+// 低频衬底：G2 + D3，音量极低，只作空间铺垫
+addDrone(98.0, 0.04);
+addDrone(146.83, 0.018);
 
 /* ============================ 混响 + 无缝循环折叠 ============================ */
-const wet = reverb(buf, 0.34);
+const wet = reverb(buf, 0.32);
 
 /**
  * 无缝循环：
@@ -245,7 +284,7 @@ mkdirSync(dirname(outPath), { recursive: true });
 const mp3 = Buffer.concat(chunks);
 writeFileSync(outPath, mp3);
 
-console.log(`时长   : ${(LOOP_N / SR).toFixed(1)} 秒（无缝循环）`);
+console.log(`时长   : ${(LOOP_N / SR).toFixed(1)} 秒（无缝循环，BPM=${BPM}）`);
 console.log(`峰值   : ${peak.toFixed(3)} → 归一化系数 ${norm.toFixed(3)}`);
 console.log(`输出   : ${outPath}`);
 console.log(`大小   : ${(mp3.length / 1024 / 1024).toFixed(2)} MB`);

@@ -1220,7 +1220,7 @@ export const POETS: Poet[] = [
     dynasty: '唐',
     birthYear: 772,
     deathYear: 846,
-    birthplace: '河南新郑',
+    birthplace: '新郑（今河南新郑）',
     brief:
       '字乐天，号香山居士。贞元进士，官至刑部尚书。倡「新乐府」运动，主张「文章合为时而著，歌诗合为事而作」，诗风平易，流传极广，世称「诗魔」「诗王」。',
     avatarColor: '#8C5A3C',
@@ -4016,7 +4016,7 @@ export const POETS: Poet[] = [
     dynasty: '宋',
     birthYear: 1007,
     deathYear: 1072,
-    birthplace: '绵州（今四川绵阳）',
+    birthplace: '绵州（今四川绵阳）；祖籍吉州永丰（今江西吉安永丰）',
     brief:
       '字永叔，号醉翁、六一居士，吉州永丰人。天圣进士，累官枢密副使、参知政事，主修《新唐书》《新五代史》。北宋诗文革新领袖，奖掖苏轼、曾巩、王安石，列「唐宋八大家」。',
     avatarColor: '#8A6D4B',
@@ -4102,8 +4102,8 @@ export const POETS: Poet[] = [
             id: 'ouyangxiu-w2',
             title: '戏答元珍',
             genre: '七言律诗',
-            year: 1036,
-            yearLabel: '景祐三年',
+            year: 1037,
+            yearLabel: '景祐四年',
             placeId: 'ouyangxiu-n5',
             excerpt: '春风疑不到天涯，二月山城未见花。曾是洛阳花下客，野芳虽晚不须嗟。',
             fullText:
@@ -4178,13 +4178,14 @@ export const POETS: Poet[] = [
       },
       {
         id: 'ouyangxiu-n8',
-        year: 1050,
-        era: '皇祐二年',
+        year: 1049,
+        era: '皇祐元年',
         place: '颍州',
         modernPlace: '安徽阜阳',
         lng: 115.82,
         lat: 32.9,
-        age: 43,
+        age: 42,
+
         eventType: 'office',
         event: '知颍州。爱颍州西湖之胜，有终焉之志；后复官翰林，仍念念不忘颍上。',
         works: [],
