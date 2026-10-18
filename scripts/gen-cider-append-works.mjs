@@ -195,16 +195,33 @@ const PROSE_BLOCK = new RegExp(
    '读者', '艺术', '手法', '形象', '议论', '讽刺', '表现', '语言', '风格', '意境',
    '特点', '好处', '妙在', '好在', '并非', '不只是', '不仅仅', '从而', '进而',
    '值得一提', '可以看出', '由此可见', '众所周知', '需要说明',
-   '感情', '效果', '诗云', '词云', '有云', '著称', '大概是',
-   '似乎', '多年来', '两解', '总结', '陶冶', '倏忽', '不堪闻问'].join('|'),
+   '感情', '效果', '诗云', '词云', '有云', '著称', '大概是', '作此',
+   '似乎', '多年来', '两解', '总结', '陶冶', '倏忽', '不堪闻问',
+   '尤其是', '这话', '这段话', '未免', '略带', '夸张', '意味深长', '过情'].join('|'),
 );
 const CLAUSE_SEQ = /^[一二三四五六七八九十]+[、．.]/;
+
+/**
+ * 辞典「注释串讲」的特征 —— 这类文字每句都不长、长度也整齐，光看句长很容易
+ * 被当成韵文收进来（抽样报告里约 4% 的条目栽在这）：
+ *   姜夔《暗香》小序  「辛亥之冬，予载雪诣石湖……作此两曲。」
+ *   李商隐《咏史》注  「"北湖"即玄武湖。"南埭"即鸡鸣埭，都是六朝帝王寻欢作乐的地方。」
+ *   周邦彦《西平乐》注「"重慕想"领起的五句，"重"，深、甚之意……召平原是秦东陵侯。」
+ *   杜甫《奉济驿…》注  「奉济驿，在成都东北的绵阳县。严公，即严武，曾两度为剑南节度使。」
+ */
+const QUOTE_EXPLAIN = /["“”][^”"]{1,14}["”]\s*(即|是指|指|谓|音|也|，)/;
+const NOTE_EXPLAIN = /[一-龥]{2,8}[，、]\s*(即|是指|意为|音|本作|一作)[^，。]{2,24}/;
+const PLACE_EXPLAIN =
+  /[一-龥]{2,8}[，、]\s*(在|位于|治|属)[^，。]{2,16}(县|州|府|郡|道|路|山|水|镇|村|寺|宫|驿|城|陵)/;
 
 /** 一个「大句」是否为散文块 */
 function clauseProse(c) {
   if (!c) return false;
   if (CLAUSE_SEQ.test(c)) return true;      // 「一、议论附丽于形象。」
   if (PROSE_BLOCK.test(c)) return true;
+  if (QUOTE_EXPLAIN.test(c)) return true;
+  if (NOTE_EXPLAIN.test(c)) return true;
+  if (PLACE_EXPLAIN.test(c)) return true;
   if (STRONG.test(c)) return true;
   if (MODERN.test(c)) return true;
   if (QUOTE.test(c)) return true;
@@ -215,6 +232,13 @@ function clauseProse(c) {
     .filter(Boolean);
   const lens = units.map((u) => u.length);
   const clean = c.replace(/[\s。，！？；：、]/g, '');
+  // 齐言韵文优先：句读长度**完全一致**且每句 ≤9 字（七言 7/7/7/7、五言 5/5…）
+  // 时，无论总长多少都判为韵文。
+  // 李白《金陵酒肆留别》首联四句连写成「风吹柳花满店香，吴姬压酒劝客尝，
+  // 金陵子弟来相送，欲行不行各尽觞。」净长 33 字，仅凭 clean>26 会被误判成
+  // 散文，剥掉后只剩末联 14 字 → 整首被丢弃。
+  const uniform = lens.length >= 2 && new Set(lens).size === 1 && lens[0] <= 9;
+  if (uniform) return false;
   if (clean.length > 26) return true;        // 韵文一联两句顶多 14~16 字
   const max = lens.length ? Math.max(...lens) : 0;
   const min = lens.length ? Math.min(...lens) : 0;
@@ -296,6 +320,11 @@ function normalizeBody(body) {
   // 标点后多余的空格（孟郊《洛桥晚望》「人行绝； 榆柳萧疏」）：
   // 不去掉会让「空格分段」逻辑把它误判成小序分隔符
   t = t.replace(/([；，、：])\s+/g, '$1');
+  // 分号统一视为句末：语料里偶有用「；」代替「。」分联的写法
+  // （孟郊《洛桥晚望》「天津桥下冰初结，洛阳陌上人行绝；榆柳萧疏楼阁闲…」、
+  //  李商隐《乐游原》「向晚意不适，驱车登古原；夕阳无限好，只是近黄昏。」），
+  //  不归一会导致整首诗只切出一个大句，被误判成残片丢弃。
+  t = t.replace(/；/g, '。');
   // 开头孤引号：小序被截断后残留的半个引号（姜夔《琵琶仙》「”唯吴兴为然。」）
   t = t.replace(/^["“”'‘’]+/, '');
   return t.replace(/[ \t]+/g, ' ').trim();
@@ -324,8 +353,14 @@ function stripTitlePrefix(text, title) {
     const tok = m[1];
     const ntk = normTitle(tok);
     const rest = t.slice(m[0].length);
-    // ① 词牌/标题
-    if (nt && (nt === ntk || nt.includes(ntk) || ntk.includes(nt))) {
+    // ① 词牌/标题 —— 必须**严格相等**，不能放宽成双向 includes！
+    //    「ntk.includes(nt)」会把「首联里恰好含题名」的诗整联吃掉：
+    //    杜甫《八阵图》首联「功盖三分国，名成八阵图」→ 含「八阵图」→ 首联被剥，
+    //    全诗只剩「江流石不转，遗恨失吞吴」两句；刘禹锡《台城》「台城六代竞豪华」、
+    //    李商隐《瑶池》「瑶池阿母绮窗开」、白居易《望驿台》「望驿台前扑地花」、
+    //    《贾生》「贾生才调更无伦」、李商隐《为有》「为有云屏无限娇」同此教训。
+    //    另外要求剥掉后正文仍有 ≥25 字，双保险。
+    if (nt && ntk === nt && net(rest) >= 25) {
       t = rest;
       continue;
     }
@@ -550,7 +585,14 @@ for (const dyn of ['唐', '宋']) {
       have.add(k);
       const text = cleaned.text;
       const dTitle = displayTitle(w.title);
-      const title = cleaned.sub ? `${dTitle} ${cleaned.sub}` : dTitle;
+      // sub（词题）已被标题包含时不再重复拼接，避免出现「念奴娇 念奴娇」
+      // 注：不要用「2~3 字 + 空格 + 1~2 字」去过滤「署名型标题」——
+      // 那会把「卜算子 咏梅」「清平乐 春晚」这类两字词题整批误杀（实测 -78 篇）。
+      // 杜甫《李 冶》那种条目靠 clauseProse 的赏析词识别（见 PROSE_BLOCK）丢弃。
+      const title =
+        cleaned.sub && !normTitle(dTitle).includes(normTitle(cleaned.sub))
+          ? `${dTitle} ${cleaned.sub}`
+          : dTitle;
 
       const node = targets[seq % targets.length];
       seq++;
