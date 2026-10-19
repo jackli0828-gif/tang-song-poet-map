@@ -63,7 +63,11 @@ export default function MapWorkPopup({
   // 迭代 11：此地还有多少位「其他」诗人到访（用于浮层底部入口）
   const otherVisitors = Math.max(0, visitorNamesAt(node.lng, node.lat).length - 1);
   // 迭代 12：作品朗读（与时间轴的「朗读生平」共用同一个语音单例，同一时刻只有一处发声）
-  const { speak, cancelSpeech, speakingId, supported: speechOk } = useSpeechState();
+  // 迭代 14：新增 TTS 引擎 / 音色 切换（Edge 拟人化 ↔ 系统机械音）
+  const {
+    speak, cancelSpeech, speakingId,
+    engine, setEngine, cycleVoice, voiceLabel,
+  } = useSpeechState();
   // 迭代 13：拖拽中状态（用于改变 cursor）
   const [dragging, setDragging] = useState(false);
 
@@ -194,24 +198,52 @@ export default function MapWorkPopup({
                       >
                         {expanded ? '收起' : '展开全文'}
                       </button>
-                      {/* 迭代 12：朗读此篇作品（再次点击即停止） */}
-                      {speechOk ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (speakingId === w.id) cancelSpeech();
-                            else speak(`《${w.title}》。${w.fullText ?? w.excerpt}`, w.id);
-                          }}
-                          className={`rounded-sm border px-1.5 py-0.5 transition ${
-                            speakingId === w.id
-                              ? 'border-cinnabar bg-cinnabar text-paper'
-                              : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
-                          }`}
-                          title={speakingId === w.id ? '停止朗读' : '朗读此篇作品'}
-                        >
-                          {speakingId === w.id ? '🔊 朗读中' : '🔊 朗读'}
-                        </button>
-                      ) : null}
+                      {/* 迭代 12：朗读此篇作品（再次点击即停止）
+                          迭代 14：朗读按钮旁新增「换声音」循环按钮，点几次轮换 5 个 Edge 音色 */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (speakingId === w.id) cancelSpeech();
+                          else speak(`《${w.title}》。${w.fullText ?? w.excerpt}`, w.id);
+                        }}
+                        className={`rounded-sm border px-1.5 py-0.5 transition ${
+                          speakingId === w.id
+                            ? 'border-cinnabar bg-cinnabar text-paper'
+                            : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
+                        }`}
+                        title={
+                          speakingId === w.id
+                            ? '停止朗读'
+                            : engine === 'edge'
+                              ? `朗读此篇作品（${voiceLabel}）`
+                              : '朗读此篇作品（系统声音）'
+                        }
+                      >
+                        {speakingId === w.id ? '🔊 朗读中' : '🔊 朗读'}
+                      </button>
+                      {/* 迭代 14：换声音循环按钮 + 引擎切换 */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cycleVoice();
+                        }}
+                        className="rounded-sm border border-cinnabar/25 px-1.5 py-0.5 text-cinnabar/70 hover:bg-cinnabar/10 hover:text-cinnabar transition"
+                        title={`换音色（${voiceLabel}）`}
+                      >
+                        🔈 换音
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEngine(engine === 'edge' ? 'system' : 'edge');
+                        }}
+                        className="rounded-sm border border-cinnabar/25 px-1.5 py-0.5 text-cinnabar/70 hover:bg-cinnabar/10 hover:text-cinnabar transition"
+                        title={engine === 'edge' ? 'Edge 拟人化 → 系统机械音' : '系统机械音 → Edge 拟人化'}
+                      >
+                        {engine === 'edge' ? '拟人音' : '系统音'}
+                      </button>
                       {w.fullText ? null : <span className="text-ink-4">（长篇仅节选）</span>}
                     </div>
                     <p className="mt-1 text-[12.5px] leading-relaxed text-ink-4">【背景】{w.background}</p>

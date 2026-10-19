@@ -69,6 +69,10 @@ const STRONG_LONG = new RegExp(
 /** 已并入 STRONG_LONG（>10 字）。温庭筠《蔡中郎坟》「莫抛心力作词人」
  *  属个例，宁可判为残片不收录，也不放赏析进正文。 */
 const DIGIT = /[0-9０-９①-⑳]/;
+/** 语料里词句结尾的「！」（如苏轼「一时多少豪杰！」）会被当句末标点切开，
+ *  污染句读切分，必须归一化为句号。保留「？」（「当年的战场究竟在哪儿？」
+ *  等设问偶见且多为赏析，误切代价低）。 */
+const EXCL = /[！？]+/;
 /** 夹注：（）内含今地/古地/治所等考据信息 */
 const MODERN = /（[^）]*(今|治今|在今|故址|旧址|古称|古代又称|一说)[^）]*）/;
 /** 「……说：」「……云：」式引论 */
@@ -120,21 +124,23 @@ function isProse(s, authorName, idx) {
  * 不能简单「遇到散文就停」——宋词常在正文前有小序（如苏轼《满庭芳》
  * 「元丰七年四月一日，余将去黄移汝……」），一上来就是散文，直接截断会
  * 得到空串。取最长连续韵文段可同时跳过前置小序与后置赏析。
+ * 拼回时保留原文空格（词上下片之间的空格是 trimProse 的分段依据）。
  */
 function pickVerse(text, authorName, dynasty) {
-  const all = String(text || '')
-    .split(/(?<=[。！？])/)
-    .map((s) => s.trim())
+  const raw = String(text || '').replace(EXCL, '。');
+  // 按句号切分，保留每个片段（不 trim），以便拼接时还原空格
+  const all = raw
+    .split(/(?<=[。])/)
     .filter(Boolean);
-  const join = (arr) => arr.map((s) => s.replace(/[。！？]$/, '')).join('。') + '。';
-
-  // 赏析开场（hard）之后绝无正文，先把句子表截断到那里
-  const hardAt = all.findIndex((s, i) => isProse(s, authorName, i) === 'hard');
-  const sents = hardAt >= 0 ? all.slice(0, hardAt) : all;
+  const join = (arr) => arr.map((s) => s.replace(/[。]$/, '')).join('。') + '。';
+  // 判断单句是否散文（用 trim 后的内容）
+  const flagsAll = all.map((s, i) => isProse(s.trim(), authorName, i));
+  const hardAt = flagsAll.findIndex((f) => f === 'hard');
+  const limit = hardAt >= 0 ? hardAt : all.length;
 
   const len = (s) => s.replace(/[。，！？；、\s]/g, '');
   const build = (arr) => {
-    const flags = arr.map((s, i) => isProse(s, authorName, i));
+    const flags = arr.map((s, i) => isProse(s.trim(), authorName, i));
     const runs = [];
     let i = 0;
     while (i < arr.length) {
@@ -149,20 +155,14 @@ function pickVerse(text, authorName, dynasty) {
     return runs;
   };
 
-  const pick = (arr) => {
+  const pick = (arr, minSent) => {
     const allRuns = build(arr);
-    // 至少要有「≥2 句 或 ≥40 字」的段，否则视为没取到（多半只捞到小序）
     const runs = allRuns.filter((r) => r.j - r.i >= 2 || r.total >= 24);
     if (!runs.length) return '';
     const first = runs[0];
-    // ① 首选「首段」：唐诗正文在最前，其后的赏析碎句虽可能更长也不可取
-    //    （杜甫《房兵曹胡马》、王维《酬张少府》都栽在这）。
-    //    宋词正文前常有小序（多为 1~2 句），故宋代要求首段 ≥3 句才采信。
-    const minSent = dynasty === '宋' ? 3 : 2;
     if (first.i === 0 && first.avg <= 26 && first.j - first.i >= minSent && first.total >= 20) {
       return join(arr.slice(first.i, first.j));
     }
-    // ② 否则逐级放宽句均长，在合格候选里取最长一段
     let pool = runs;
     for (const lim of AVG_LADDER) {
       const c = runs.filter((r) => r.avg <= lim);
@@ -172,8 +172,9 @@ function pickVerse(text, authorName, dynasty) {
     return join(arr.slice(best.i, best.j));
   };
 
-  // 先在「赏析开场之前」的子集里取；取不到再用全表
-  return pick(sents) || pick(all);
+  const minSent = dynasty === '宋' ? 3 : 2;
+  // 先取赏析开场之前的子集；取不到再用全表
+  return pick(all.slice(0, limit), minSent) || pick(all, minSent);
 }
 
 /**
@@ -251,46 +252,79 @@ function clauseProse(c) {
 }
 
 function trimProse(text) {
-  const sents = String(text || '')
-    .split(/(?<=[。！？])/)
+  const raw = String(text || '').replace(EXCL, '。');
+  // 语料正文是**空格分联/片**（「一时多少豪杰。 遥想公瑾当年…」上下片之间
+  // 只有空格、无句末标点），赏析与正文之间才是空行级的大段落。
+  // 早期「按句号切大句 + 块级散文判定」的写法，把「下片起句 上片」粘在
+  // 一个大句里，净长累计后误判成散文，双调词下片整块被丢（5 例 TRUNC 的根因）。
+  // 改为「按空格切段」：段之间才是散文缝（小序/赏析），段内空格是韵文联/片界。
+  const segs = raw
+    .split(/\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  const flags = sents.map(clauseProse);
-  const net = (a, b) =>
-    sents.slice(a, b).join('').replace(/[\s。，！？；：、]/g, '').length;
+  // 段级散文判定：只有「赏析/小序/考据」这类段落才判散文，
+  // 词/诗的正文联/片（无论长短句参差、无论总多长）一律判为韵文。
+  // 依据：赏析段落必然含赏析特征词或中文日期/书名号；
+  // 而纯正文段落（如「大江东去，浪淘尽、千古风流人物。」）不含这些。
+  const segProse = (s) => {
+    if (!s) return false;
+    if (CLAUSE_SEQ.test(s)) return true;
+    if (PROSE_BLOCK.test(s)) return true;
+    if (QUOTE_EXPLAIN.test(s)) return true;
+    if (NOTE_EXPLAIN.test(s)) return true;
+    if (PLACE_EXPLAIN.test(s)) return true;
+    if (STRONG.test(s)) return true;
+    if (MODERN.test(s)) return true;
+    if (QUOTE.test(s)) return true;
+    if (CN_DATE.test(s)) return true;
+    return false;
+  };
+  const segFlags = segs.map(segProse);
+  const segNet = (a, b) =>
+    segs.slice(a, b + 1).join('').replace(/[\s。，！？；：、]/g, '').length;
 
-  // 只有一个「大句」：真诗词至少切出 2 个以上（绝句 2 联、词通常 ≥4 句），
-  // 单句只可能是残片或整段散文 —— 李商隐《日日》「山城斜路之旁，杏花开得正盛…」
-  // 与姜夔《长亭怨慢》小序「予颇喜自制曲…」都属于这种。
-  if (sents.length < 2) {
-    const n = net(0, 1);
-    if (clauseProse(sents[0] || text) || n < 40) return null;
-    return text;
-  }
+  if (!segs.length) return null;
 
-  // 切出所有「连续非散文块」
+  // 切出所有「连续非散文段」
   const runs = [];
   let i = 0;
-  while (i < sents.length) {
-    if (flags[i]) { i++; continue; }
+  while (i < segs.length) {
+    if (segFlags[i]) { i++; continue; }
     let j = i;
-    while (j < sents.length && !flags[j]) j++;
+    while (j < segs.length && !segFlags[j]) j++;
     runs.push({ i, j });
     i = j;
   }
   if (!runs.length) return null;
 
-  // 注意：不能「从后往前删到第一个散文块为止」—— 赏析的收尾句往往是一句
-  // 长度正常的散文（李商隐《北齐二首》末句「这两句意思一气蝉联，谓荒淫即
-  // 亡国取败的先兆。」仅 20 字），从后往前扫会在第一步就停下，整段赏析漏网。
-  // 改为「取最靠前的合格韵文块」，正文通常就在最前（其前若有小序已先被剔除）。
-  const first = runs[0];
+  // 合并被「单个短散段」隔断的相邻韵文段（双调词过片/小注常夹在上下片间）。
+  // 只在「合并间隙净长 ≤12 字且无句末标点」时才合并，赏析通常成段（净长远超 12），
+  // 不会被误并入。
+  const merged = [];
+  for (const r of runs) {
+    const last = merged[merged.length - 1];
+    if (last) {
+      const gap = segs.slice(last.j, r.i).join(' ');
+      const gapNet = gap.replace(/[\s。，！？；：、]/g, '').length;
+      if (gapNet <= 12) {
+        last.j = r.j;
+        continue;
+      }
+    }
+    merged.push({ i: r.i, j: r.j });
+  }
+
+  // 注意：不能「从后往前删到第一个散文段为止」—— 赏析的收尾句往往是一句
+  // 长度正常的散文（李商隐《北齐二首》末句「这两句意思一气蝉联…」仅 20 字），
+  // 从后往前扫会在第一步就停下，整段赏析漏网。
+  // 改为「取最靠前的合格韵文段」，正文通常就在最前（其前若有小序已先被剔除）。
+  const first = merged[0];
   let best = first;
-  const firstOk = first.i === 0 && (first.j - first.i >= 2 || net(first.i, first.j) >= 20);
+  const firstOk = first.i === 0 && (first.j - first.i >= 2 || segNet(first.i, first.j) >= 20);
   if (!firstOk) {
-    best = runs.reduce((a, b) => {
-      const na = net(a.i, a.j);
-      const nb = net(b.i, b.j);
+    best = merged.reduce((a, b) => {
+      const na = segNet(a.i, a.j);
+      const nb = segNet(b.i, b.j);
       // 长度相差不足 10% 时取靠前的一块（正文多半在前）
       if (Math.abs(nb - na) < Math.max(4, na * 0.1)) return b.i < a.i ? b : a;
       return nb > na ? b : a;
@@ -298,13 +332,13 @@ function trimProse(text) {
   }
   // 剥完不足 20 字 ⇒ 说明主体本身就是散文（温庭筠《蔡中郎坟》整条都是赏析），
   // 返回 null 交给调用方丢弃，而不是回滚成一段赏析。
-  if (net(best.i, best.j) < 20) return null;
-  // 剥离后同样可能只剩一个大句（李商隐《日日》、李益《行舟》、贺铸《青玉案》
-  // 的赏析残句都是这样漏网的），再判一次
-  if (best.j - best.i < 2 && net(best.i, best.j) < 40) return null;
-  return sents
-    .slice(best.i, best.j)
-    .map((s) => s.replace(/[。！？]$/, ''))
+  if (segNet(best.i, best.j) < 20) return null;
+  // 剥离后同样可能只剩一个段（李商隐《日日》、李益《行舟》、贺铸《青玉案》
+  // 的赏析残段都是这样漏网的），再判一次
+  if (best.j - best.i < 1 && segNet(best.i, best.j) < 40) return null;
+  return segs
+    .slice(best.i, best.j + 1)
+    .map((s) => s.replace(/[。]$/, ''))
     .join('。') + '。';
 }
 
@@ -325,6 +359,10 @@ function normalizeBody(body) {
   //  李商隐《乐游原》「向晚意不适，驱车登古原；夕阳无限好，只是近黄昏。」），
   //  不归一会导致整首诗只切出一个大句，被误判成残片丢弃。
   t = t.replace(/；/g, '。');
+  // 感叹号归一：语料里词句以「！」结尾（苏轼「一时多少豪杰！」）会污染句读
+  // 切分（与 ！？ 同被当句末切开，导致块边界错位）。保留「？」—— 设问偶见
+  // 且基本出现在赏析段，误切代价低。
+  t = t.replace(/[！]+/g, '。');
   // 开头孤引号：小序被截断后残留的半个引号（姜夔《琵琶仙》「”唯吴兴为然。」）
   t = t.replace(/^["“”'‘’]+/, '');
   return t.replace(/[ \t]+/g, ' ').trim();

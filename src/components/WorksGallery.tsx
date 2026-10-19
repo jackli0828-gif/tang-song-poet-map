@@ -15,7 +15,11 @@ export default function WorksGallery(): JSX.Element {
   const dispatch = useAppDispatch();
   const { primaryPoet } = useApp();
   // 迭代 12：作品朗读（与地图浮层、时间轴「朗读生平」共用同一个语音单例）
-  const { speak, cancelSpeech, speakingId, supported: speechOk } = useSpeechState();
+  // 迭代 14：新增 TTS 引擎 / 音色 切换（Edge 拟人化 ↔ 系统机械音）
+  const {
+    speak, cancelSpeech, speakingId,
+    engine, setEngine, cycleVoice, voiceLabel,
+  } = useSpeechState();
 
   // 迭代 4 · 检索筛选：关键词（标题/正文/背景/地点）+ 体裁下拉
   const [keyword, setKeyword] = useState('');
@@ -185,25 +189,52 @@ export default function WorksGallery(): JSX.Element {
                         {expanded ? '收起' : '展开全文'}
                       </button>
                       {/* 迭代 12：朗读此篇作品（再次点击即停止）。
+                          迭代 14：朗读按钮旁新增「换音色 / 引擎」两个小按钮。
                           需 stopPropagation，否则会触发外层卡片的「回到地图」定位。 */}
-                      {speechOk ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (speakingId === row.work.id) cancelSpeech();
-                            else speak(`《${row.work.title}》。${row.work.fullText ?? row.work.excerpt}`, row.work.id);
-                          }}
-                          className={`rounded-sm border px-1.5 py-0.5 transition ${
-                            speakingId === row.work.id
-                              ? 'border-cinnabar bg-cinnabar text-paper'
-                              : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
-                          }`}
-                          title={speakingId === row.work.id ? '停止朗读' : '朗读此篇作品'}
-                        >
-                          {speakingId === row.work.id ? '🔊 朗读中' : '🔊 朗读'}
-                        </button>
-                      ) : null}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (speakingId === row.work.id) cancelSpeech();
+                          else speak(`《${row.work.title}》。${row.work.fullText ?? row.work.excerpt}`, row.work.id);
+                        }}
+                        className={`rounded-sm border px-1.5 py-0.5 transition ${
+                          speakingId === row.work.id
+                            ? 'border-cinnabar bg-cinnabar text-paper'
+                            : 'border-cinnabar/45 text-cinnabar hover:bg-cinnabar hover:text-paper'
+                        }`}
+                        title={
+                          speakingId === row.work.id
+                            ? '停止朗读'
+                            : engine === 'edge'
+                              ? `朗读此篇作品（${voiceLabel}）`
+                              : '朗读此篇作品（系统声音）'
+                        }
+                      >
+                        {speakingId === row.work.id ? '🔊 朗读中' : '🔊 朗读'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          cycleVoice();
+                        }}
+                        className="rounded-sm border border-cinnabar/25 px-1.5 py-0.5 text-cinnabar/70 hover:bg-cinnabar/10 hover:text-cinnabar transition"
+                        title={`换音色（当前：${voiceLabel}）`}
+                      >
+                        🔈 换音
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEngine(engine === 'edge' ? 'system' : 'edge');
+                        }}
+                        className="rounded-sm border border-cinnabar/25 px-1.5 py-0.5 text-cinnabar/70 hover:bg-cinnabar/10 hover:text-cinnabar transition"
+                        title={engine === 'edge' ? 'Edge 拟人化 → 系统机械音' : '系统机械音 → Edge 拟人化'}
+                      >
+                        {engine === 'edge' ? '拟人音' : '系统音'}
+                      </button>
                       <span className="ml-auto text-ink-4">点击卡片回到地图</span>
                     </div>
                   </div>

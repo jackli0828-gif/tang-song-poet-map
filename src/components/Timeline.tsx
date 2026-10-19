@@ -160,11 +160,11 @@ export default function Timeline(): JSX.Element {
    *
    * 依赖同样不含 year，避免播放中每帧推进年份反复重读。
    */
-  const { speak, cancelSpeech, supported: speechOk } = useSpeechState();
+  const { speak, cancelSpeech } = useSpeechState();
   const wasPlayingRef = useRef(false);
   const poetRef = useRef(primaryPoet.id);
   useEffect(() => {
-    if (!speechOk) return;
+    // 迭代 14：Edge TTS 永远可用（失败回退 system），不再需要 supported 判断
 
     // ① 关闭朗读开关：立即停声
     if (!state.readBrief) {
@@ -197,7 +197,6 @@ export default function Timeline(): JSX.Element {
     primaryPoet.name,
     primaryPoet.dynasty,
     primaryPoet.brief,
-    speechOk,
     speak,
     cancelSpeech,
   ]);
@@ -248,21 +247,19 @@ export default function Timeline(): JSX.Element {
         </div>
 
         {/* 迭代 12：朗读开关 —— 播放生平轨迹时朗读该诗人的主要生平介绍。
-            浏览器不支持 Web Speech 时整块隐藏，避免给出无效按钮。 */}
-        {speechOk ? (
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'TOGGLE_READ_BRIEF' })}
-            className={`h-9 rounded-sm border px-3 text-[13px] transition ${
-              state.readBrief
-                ? 'border-cinnabar bg-cinnabar text-paper'
-                : 'border-ink-4/50 text-ink-2 hover:bg-paper-3'
-            }`}
-            title="播放生平轨迹时，朗读该诗人的主要生平介绍"
-          >
-            🔊 朗读生平
-          </button>
-        ) : null}
+            迭代 14：默认 Edge 拟人化引擎，失败回退系统。永远显示。 */}
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'TOGGLE_READ_BRIEF' })}
+          className={`h-9 rounded-sm border px-3 text-[13px] transition ${
+            state.readBrief
+              ? 'border-cinnabar bg-cinnabar text-paper'
+              : 'border-ink-4/50 text-ink-2 hover:bg-paper-3'
+          }`}
+          title="播放生平轨迹时，朗读该诗人的主要生平介绍"
+        >
+          🔊 朗读生平
+        </button>
 
         {/* 迭代 4：播放时地图自动跟随当前节点，避免「人已走出画面」看不见 */}
         <label className="flex items-center gap-1.5 text-[12px] text-ink-2" title="播放推进到新节点时，若节点移出视野，地图自动平滑归中（不改变缩放）">
