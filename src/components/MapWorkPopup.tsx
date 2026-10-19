@@ -175,19 +175,34 @@ export default function MapWorkPopup({
                 return (
                   <div key={w.id} className="work-card rounded-sm border border-ink-4/35 bg-paper-2 p-2.5">
                     <div className="flex items-baseline justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => dispatch({ type: 'TOGGLE_WORK', workId: w.id })}
-                        className="text-left text-[16px] text-ink hover:text-cinnabar"
-                        title="展开 / 收起全文"
-                      >
-                        {w.title}
-                      </button>
+                      <div className="flex min-w-0 items-baseline gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => dispatch({ type: 'TOGGLE_WORK', workId: w.id })}
+                          className="text-left text-[16px] text-ink hover:text-cinnabar"
+                          title={expanded ? '收起全文' : '展开全文'}
+                        >
+                          {w.title}
+                        </button>
+                        {/* 迭代 16：放大此篇（打开全文放大页，字号 / 页面大小可调） */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dispatch({ type: 'OPEN_WORK_FULL', workId: w.id });
+                          }}
+                          className="rounded-sm border border-ink-4/40 px-1 text-[11px] text-ink-3 transition hover:border-cinnabar/60 hover:text-cinnabar"
+                          title="放大查看全文"
+                        >
+                          ⊕ 放大
+                        </button>
+                      </div>
                       <span className="shrink-0 text-[12px] text-ink-4">
                         {w.genre} · {w.yearLabel ?? `${w.year}年`}
                       </span>
                     </div>
-                    <p className="mt-1 whitespace-pre-line font-kai text-[14.5px] leading-[1.95] text-ink-2">
+                    {/* 迭代 15 · 默认展开全文（用户反馈：长篇作品应直接可见全文，而非只有一段节选） */}
+                    <p className="mt-1 max-h-[60vh] whitespace-pre-line overflow-y-auto font-kai text-[14.5px] leading-[1.95] text-ink-2">
                       {expanded && w.fullText ? w.fullText : w.excerpt}
                     </p>
                     <div className="mt-1 flex items-center gap-2 text-[12.5px]">
@@ -244,7 +259,20 @@ export default function MapWorkPopup({
                       >
                         {engine === 'edge' ? '拟人音' : '系统音'}
                       </button>
-                      {w.fullText ? null : <span className="text-ink-4">（长篇仅节选）</span>}
+                      {/* 迭代 16：无全文标记改为可点击「查看全文 ›」，打开全文放大页 */}
+                      {w.fullText ? null : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dispatch({ type: 'OPEN_WORK_FULL', workId: w.id });
+                          }}
+                          className="text-cinnabar/80 hover:text-cinnabar hover:underline"
+                          title="打开全文放大页（字号 / 页面大小可调）"
+                        >
+                          查看全文 ›
+                        </button>
+                      )}
                     </div>
                     <p className="mt-1 text-[12.5px] leading-relaxed text-ink-4">【背景】{w.background}</p>
                   </div>

@@ -10,6 +10,7 @@ import WorkPanel from './components/WorkPanel';
 import WorksGallery from './components/WorksGallery';
 import CompareView from './components/CompareView';
 import Legend from './components/Legend';
+import WorkFullscreen from './components/WorkFullscreen';
 import { useHashSync } from './hooks/useHashSync';
 import { useBgm } from './hooks/useBgm';
 
@@ -201,6 +202,9 @@ export default function App(): JSX.Element {
         onClose={() => setGuide(null)}
         onSwitchMode={switchGuideMode}
       />
+
+      {/* 迭代 16：作品全文放大页（字号 / 页面大小可调，Esc 关闭） */}
+      <WorkFullscreen />
     </div>
   );
 }

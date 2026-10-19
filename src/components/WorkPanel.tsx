@@ -22,7 +22,16 @@ function WorkCard({ work, poetId }: { work: Work; poetId: string }): JSX.Element
         >
           {work.title}
         </button>
-        <span className="shrink-0 text-[11px] text-ink-4">
+        {/* 迭代 16：放大此篇（打开全文放大页，字号 / 页面大小可调） */}
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'OPEN_WORK_FULL', workId: work.id })}
+          className="shrink-0 rounded-sm border border-ink-4/40 px-1 text-[11px] text-ink-3 transition hover:border-cinnabar/60 hover:text-cinnabar"
+          title="放大查看全文"
+        >
+          ⊕ 放大
+        </button>
+        <span className="ml-auto shrink-0 text-[11px] text-ink-4">
           {work.genre} · {work.yearLabel ?? `${work.year}年`}
         </span>
       </div>
@@ -51,7 +60,16 @@ function WorkCard({ work, poetId }: { work: Work; poetId: string }): JSX.Element
         >
           {expanded ? '收起' : '展开全文'}
         </button>
-        {work.fullText ? null : <span className="text-ink-4">（长篇仅节选）</span>}
+        {work.fullText ? null : (
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'OPEN_WORK_FULL', workId: work.id })}
+            className="text-cinnabar/80 hover:text-cinnabar hover:underline"
+            title="打开全文放大页（字号 / 页面大小可调）"
+          >
+            查看全文 ›
+          </button>
+        )}
         <span className="ml-auto text-ink-4">{poetId ? '' : ''}</span>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAppDispatch } from '../store/PoetContext';
 import { EVENT_COLOR, EVENT_LABEL } from '../types';
 import { formatEra } from '../utils/format';
 import type { PlaceDetail, PlaceVisitorGroup } from '../utils/search';
@@ -30,6 +31,7 @@ function VisitorGroup({
   group: PlaceVisitorGroup;
   onSelectPoet: (poetId: string) => void;
 }): JSX.Element {
+  const dispatch = useAppDispatch();
   const [openWorks, setOpenWorks] = useState<Set<string>>(new Set());
   const toggle = (id: string): void =>
     setOpenWorks((prev) => {
@@ -84,14 +86,25 @@ function VisitorGroup({
                   return (
                     <div key={w.id} className="work-card rounded-sm border border-ink-4/30 bg-paper p-2">
                       <div className="flex items-baseline justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggle(w.id)}
-                          className="text-left text-[15px] text-ink hover:text-cinnabar"
-                          title="展开 / 收起全文"
-                        >
-                          {w.title}
-                        </button>
+                        <div className="flex min-w-0 items-baseline gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => toggle(w.id)}
+                            className="text-left text-[15px] text-ink hover:text-cinnabar"
+                            title="展开 / 收起全文"
+                          >
+                            {w.title}
+                          </button>
+                          {/* 迭代 16：放大此篇（打开全文放大页，字号 / 页面大小可调） */}
+                          <button
+                            type="button"
+                            onClick={() => dispatch({ type: 'OPEN_WORK_FULL', workId: w.id })}
+                            className="rounded-sm border border-ink-4/40 px-1 text-[11px] text-ink-3 transition hover:border-cinnabar/60 hover:text-cinnabar"
+                            title="放大查看全文"
+                          >
+                            ⊕ 放大
+                          </button>
+                        </div>
                         <span className="shrink-0 text-[11.5px] text-ink-4">
                           {w.genre} · {w.yearLabel ?? `${w.year}年`}
                         </span>
@@ -107,7 +120,16 @@ function VisitorGroup({
                         >
                           {expanded ? '收起' : '展开全文'}
                         </button>
-                        {w.fullText ? null : <span className="text-ink-4">（长篇仅节选）</span>}
+                        {w.fullText ? null : (
+                          <button
+                            type="button"
+                            onClick={() => dispatch({ type: 'OPEN_WORK_FULL', workId: w.id })}
+                            className="text-cinnabar/80 hover:text-cinnabar hover:underline"
+                            title="打开全文放大页（字号 / 页面大小可调）"
+                          >
+                            查看全文 ›
+                          </button>
+                        )}
                       </div>
                       <p className="mt-1 text-[12px] leading-relaxed text-ink-4">【背景】{w.background}</p>
                     </div>

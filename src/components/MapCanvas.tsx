@@ -962,15 +962,26 @@ export default function MapCanvas(): JSX.Element {
    * 推进到新节点时，若该节点已移出视口（留 60px 边距），则保持缩放级别把它平滑归中，
    * 避免「人已走出画面」却看不见。仅在「播放中 + 开启跟随」时有目标，手动操作不受干预。
    * 依赖只取节点 id：平移自身不会再次触发，避免循环。
+   * 迭代 15 · 修复「轨迹完成后闪退」：
+   * 跟随判定必须使用「当前实时变换」，而不能闭包捕获 effect 建立时的旧 transform。
+   * 否则：播放中某帧跟随 panTo 后 transform 已更新，但闭包仍持有旧值，
+   * 下一节点再次判定时会基于过期坐标误判「出界」→ 反复 panTo → 画面剧烈跳动。
+   * 现在通过 transformRef 读取最新变换，保证每次判定都基于实时视口。
    */
+  const transformRef = useRef(transform);
+  useEffect(() => {
+    transformRef.current = transform;
+  }, [transform]);
+
   const followNodeId = followTarget?.id;
   const followLng = followTarget?.lng;
   const followLat = followTarget?.lat;
   useEffect(() => {
     if (!followNodeId || followLng === undefined || followLat === undefined) return;
+    const t = transformRef.current;
     const [cx, cy] = mp.project(followLng, followLat);
-    const sx = cx * transform.k + transform.x;
-    const sy = cy * transform.k + transform.y;
+    const sx = cx * t.k + t.x;
+    const sy = cy * t.k + t.y;
     const margin = 60;
     const outside = sx < margin || sx > size.w - margin || sy < margin || sy > size.h - margin;
     if (outside) panTo(followLng, followLat);

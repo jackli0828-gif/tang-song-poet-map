@@ -150,15 +150,19 @@ export default function WorksGallery(): JSX.Element {
                     }`}
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[17px] text-ink">
-                        {row.work.title}
-                        {/* 迭代 1 · B.2：当前正在这一地创作时，标朱砂「在作」 */}
-                        {isCurrentNode ? (
-                          <span className="ml-2 rounded-sm bg-cinnabar/10 px-1.5 py-0.5 text-[11px] text-cinnabar">
-                            正在此地创作
-                          </span>
-                        ) : null}
-                      </span>
+                      <span className="text-[17px] text-ink">{row.work.title}</span>
+                      {/* 迭代 16：放大此篇（打开全文放大页，字号 / 页面大小可调） */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          dispatch({ type: 'OPEN_WORK_FULL', workId: row.work.id });
+                        }}
+                        className="shrink-0 rounded-sm border border-ink-4/40 px-1 text-[11px] text-ink-3 transition hover:border-cinnabar/60 hover:text-cinnabar"
+                        title="放大查看全文"
+                      >
+                        ⊕ 放大
+                      </button>
                       <span className="shrink-0 text-[11px] text-ink-4">
                         {row.work.genre} · {row.work.year}
                       </span>
@@ -174,7 +178,9 @@ export default function WorksGallery(): JSX.Element {
                       <span>·</span>
                       <span>年 {ageAt(row.work.year, primaryPoet.birthYear)}</span>
                     </div>
-                    <p className="mt-1.5 whitespace-pre-line font-kai text-[15.5px] leading-[1.9] text-ink-2">
+                    <p className={`mt-1.5 whitespace-pre-line font-kai text-[15.5px] leading-[1.9] text-ink-2 ${
+                      expanded ? 'max-h-[60vh] overflow-y-auto' : ''
+                    }`}>
                       {expanded && row.work.fullText ? row.work.fullText : row.work.excerpt}
                     </p>
                     <div className="mt-1.5 flex items-center gap-2 text-[11px]">
@@ -235,6 +241,19 @@ export default function WorksGallery(): JSX.Element {
                       >
                         {engine === 'edge' ? '拟人音' : '系统音'}
                       </button>
+                      {row.work.fullText ? null : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dispatch({ type: 'OPEN_WORK_FULL', workId: row.work.id });
+                          }}
+                          className="rounded-sm border border-cinnabar/25 px-1.5 py-0.5 text-cinnabar/70 transition hover:bg-cinnabar/10 hover:text-cinnabar"
+                          title="打开全文放大页（字号 / 页面大小可调）"
+                        >
+                          查看全文 ›
+                        </button>
+                      )}
                       <span className="ml-auto text-ink-4">点击卡片回到地图</span>
                     </div>
                   </div>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react';
 import { POETS, POET_MAP } from '../data/poets';
 import type { EraKey, PanelView, PlaySpeed, Poet } from '../types';
+import { activeNodeIndex } from '../utils/geo';
 
 /** 王朝筛选 */
 export type DynastyFilter = 'all' | '唐' | '宋';
@@ -52,6 +53,8 @@ export interface AppState {
   readBrief: boolean;
   /** 古韵背景音乐开关 */
   bgmOn: boolean;
+  /** 迭代 16：当前在「全文放大页」中展示的作品 id（null 表示未打开） */
+  openWorkId: string | null;
 }
 
 export type AppAction =
@@ -92,7 +95,9 @@ export type AppAction =
   /** 迭代 12：切换「播放生平轨迹时朗读诗人小传」 */
   | { type: 'TOGGLE_READ_BRIEF' }
   /** 迭代 12：切换古韵背景音乐 */
-  | { type: 'TOGGLE_BGM' };
+  | { type: 'TOGGLE_BGM' }
+  /** 迭代 16：打开 / 关闭「作品全文放大页」 */
+  | { type: 'OPEN_WORK_FULL'; workId: string | null };
 
 const MAX_COMPARE = 3;
 
@@ -126,6 +131,8 @@ export const initialState: AppState = {
   mapFullscreen: false,
   readBrief: true,
   bgmOn: true,
+  // 迭代 16：全文放大页默认关闭
+  openWorkId: null,
 };
 
 /** 依据诗人 id 取当前年份（回退到出生年） */
@@ -189,6 +196,9 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, yearByPoet: nextYears, lockedNodeByPoet: {} };
     }
     case 'SET_NODE': {
+      // 迭代 15 · 作品默认展开全文：定位到某节点时，把该节点的所有作品默认展开
+      const node = POET_MAP[action.poetId]?.nodes.find((n) => n.id === action.nodeId);
+      const workIds: string[] = node && node.works.length > 0 ? node.works.map((w) => w.id) : [];
       if (state.syncYears) {
         const nextYears: Record<string, number> = { ...state.yearByPoet };
         for (const id of state.selectedIds) nextYears[id] = action.year;
@@ -197,13 +207,20 @@ function reducer(state: AppState, action: AppAction): AppState {
         const locked: Record<string, string | null> = { ...state.lockedNodeByPoet };
         for (const id of state.selectedIds) locked[id] = null;
         locked[action.poetId] = action.nodeId;
-        return { ...state, yearByPoet: nextYears, lockedNodeByPoet: locked, playing: false };
+        return {
+          ...state,
+          yearByPoet: nextYears,
+          lockedNodeByPoet: locked,
+          playing: false,
+          expandedWorkIds: workIds.length > 0 ? [...state.expandedWorkIds, ...workIds] : state.expandedWorkIds,
+        };
       }
       return {
         ...state,
         yearByPoet: { ...state.yearByPoet, [action.poetId]: action.year },
         lockedNodeByPoet: { ...state.lockedNodeByPoet, [action.poetId]: action.nodeId },
         playing: false,
+        expandedWorkIds: workIds.length > 0 ? [...state.expandedWorkIds, ...workIds] : state.expandedWorkIds,
       };
     }
     case 'RESET_YEAR': {
@@ -221,9 +238,60 @@ function reducer(state: AppState, action: AppAction): AppState {
         playing: false,
       };
     }
-    case 'TOGGLE_PLAY':
-      return { ...state, playing: !state.playing };
+    case 'TOGGLE_PLAY': {
+      // 迭代 15 · 修复「轨迹播放完成后闪退」：
+      // 播放中每帧 SET_YEAR 都会把 lockedNodeByPoet[poetId] 置 null（关掉浮层），
+      // 播完时若用户按空格想暂停/重播，没有「当前节点」供浮层定位 → 画面看起来像闪退。
+      // 这里在 暂停→播放 切换时，把「当前年份对应的活动节点」锁上，
+      // 让地图作品浮层在播放终点（或暂停点）稳定呈现，不会闪掉。
+      if (!state.playing) {
+        // 将要进入播放态：锁上出生年节点（轨迹起点），浮层在起点稳定呈现
+        const poet = POET_MAP[state.primaryId];
+        if (poet) {
+          const birthNode = poet.nodes.find((n) => n.eventType === 'birth') ?? poet.nodes[0];
+          if (birthNode) {
+            const locked = { ...state.lockedNodeByPoet, [state.primaryId]: birthNode.id };
+            return { ...state, playing: true, lockedNodeByPoet: locked };
+          }
+        }
+        return { ...state, playing: true };
+      }
+      // 将要暂停：锁上当前年份对应的活动节点（可能是轨迹终点），浮层稳定呈现
+      const poet = POET_MAP[state.primaryId];
+      if (poet) {
+        const curYear = state.yearByPoet[state.primaryId] ?? poet.birthYear;
+        const idx = activeNodeIndex(poet.nodes, curYear);
+        const node = idx >= 0 ? poet.nodes[idx] : undefined;
+        if (node) {
+          const locked = { ...state.lockedNodeByPoet, [state.primaryId]: node.id };
+          return { ...state, playing: false, lockedNodeByPoet: locked };
+        }
+      }
+      return { ...state, playing: false };
+    }
     case 'SET_PLAYING':
+      // 迭代 15 · 修复「轨迹播放完成后闪退」：
+      // 播放走到末年自动停止（useTimelinePlayer 的 onEnd）时，
+      // 若镜头跟随开启，panTo 在最后一帧触发，浮层又被 SET_YEAR 的 null 锁清掉，
+      // 三件事叠加在 260ms 内发生 → 画面剧烈跳动（用户感知为「闪退」）。
+      // 这里把「当前年份对应的活动节点」锁上，让浮层在轨迹终点稳定呈现，
+      // 同时避免浮层随镜头飞行反复重定位。
+      if (action.playing === false) {
+        const poet = POET_MAP[state.primaryId];
+        if (poet) {
+          const curYear = state.yearByPoet[state.primaryId] ?? poet.deathYear;
+          const idx = activeNodeIndex(poet.nodes, curYear);
+          const node = idx >= 0 ? poet.nodes[idx] : undefined;
+          if (node) {
+            return {
+              ...state,
+              playing: false,
+              lockedNodeByPoet: { ...state.lockedNodeByPoet, [state.primaryId]: node.id },
+            };
+          }
+        }
+        return { ...state, playing: false };
+      }
       return { ...state, playing: action.playing };
     case 'SET_SPEED':
       return { ...state, speed: action.speed };
@@ -298,6 +366,9 @@ function reducer(state: AppState, action: AppAction): AppState {
     // 迭代 12：古韵背景音乐
     case 'TOGGLE_BGM':
       return { ...state, bgmOn: !state.bgmOn };
+    // 迭代 16：作品全文放大页
+    case 'OPEN_WORK_FULL':
+      return { ...state, openWorkId: action.workId };
     default:
       return state;
   }
