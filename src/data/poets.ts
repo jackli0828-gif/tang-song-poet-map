@@ -5588,6 +5588,16 @@ export const POETS: Poet[] = [
  */
 export const WORKS_ADD_COUNT = applyWorksAdd(POETS);
 
+/**
+ * 辞典补录作品 · 地点/系年回填
+ * ------------------------------------------------------------------
+ * 上一步 works-add 把辞典补录作品「轮转挂载」到作者已有节点（待考），
+ * 这里再用辞典赏析里明指的真正创作地/系年回填（work-plink.ts），
+ * 让作品落到正确的时空点上。必须先于 POET_MAP 构造执行。
+ */
+import { applyWorkPlink } from './work-plink';
+export const WORK_PLINK_COUNT = applyWorkPlink(POETS);
+
 /** id → 诗人 */
 export const POET_MAP: Record<string, Poet> = POETS.reduce(
   (acc, p) => {
@@ -5632,4 +5642,5 @@ export const DATA_STATS = {
   nodes: POETS.reduce((s, p) => s + p.nodes.length, 0),
   works: ALL_WORKS.length,
   worksAdd: WORKS_ADD_COUNT,
+  workPlink: WORK_PLINK_COUNT,
 };
