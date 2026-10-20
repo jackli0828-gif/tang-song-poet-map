@@ -1,0 +1,60 @@
+// Generated from edge-tts drm.py constants. DO NOT EDIT.
+// Ported verbatim from gitMFQ/ttss (service/edge-tts-service/drm-constants.ts),
+// itself derived from rany2/edge-tts src/edge_tts/constants.py.
+// These are pure bigint/string constants — no Node.js dependencies, safe in browsers.
+export const SHA256_ROUND_CONSTANTS: bigint[] = [
+  0x428A2F98n, 0x71374491n, 0xB5C0FBCFn, 0xE9B5DBA5n,
+  0x3956C25Bn, 0x59F111F1n, 0x923F82A4n, 0xAB1C5ED5n,
+  0xD807AA98n, 0x12835B01n, 0x243185BEn, 0x550C7DC3n,
+  0x72BE5D74n, 0x80DEB1FEn, 0x9BDC06A7n, 0xC19BF174n,
+  0xE49B69C1n, 0xEFBE4786n, 0x0FC19DC6n, 0x240CA1CCn,
+  0x2DE92C6Fn, 0x4A7484AAn, 0x5CB0A9DCn, 0x76F988DAn,
+  0x983E5152n, 0xA831C66Dn, 0xB00327C8n, 0xBF597FC7n,
+  0xC6E00BF3n, 0xD5A79147n, 0x06CA6351n, 0x14292967n,
+  0x27B70A85n, 0x2E1B2138n, 0x4D2C6DFCn, 0x53380D13n,
+  0x650A7354n, 0x766A0ABBn, 0x81C2C92En, 0x92722C85n,
+  0xA2BFE8A1n, 0xA81A664Bn, 0xC24B8B70n, 0xC76C51A3n,
+  0xD192E819n, 0xD6990624n, 0xF40E3585n, 0x106AA070n,
+  0x19A4C116n, 0x1E376C08n, 0x2748774Cn, 0x34B0BCB5n,
+  0x391C0CB3n, 0x4ED8AA4An, 0x5B9CCA4Fn, 0x682E6FF3n,
+  0x748F82EEn, 0x78A5636Fn, 0x84C87814n, 0x8CC70208n,
+  0x90BEFFFAn, 0xA4506CEBn, 0xBEF9A3F7n, 0xC67178F2n,
+]
+
+export const SHA256_SCHEDULE: bigint[] = [
+  0xEB24BF9En, 0x1558691Fn, 0xA0C09EE2n, 0x0CFA32BAn, 0xA622EE8Cn, 0xD1DD9491n, 0xC0DD25A0n, 0xF9E70AB6n, 0xF0C31573n, 0x7058CE4En, 0x7188E606n, 0x00E5AB33n, 0xD258B060n, 0x72766564n,
+]
+
+export const CS64_COEFFICIENTS: [bigint, bigint][] = [
+  [0xE82E91B1n, 0xB32700D0n],
+  [0x44DE24C6n, 0x88DFF51Dn],
+  [0x3BEB65BCn, 0x29514038n],
+  [0xC89C5933n, 0xB328CBDFn],
+  [0x8D1EC211n, 0xD405B4D5n],
+  [0x314EF5D5n, 0x26E55F3Cn],
+  [0xE92491B1n, 0x607801C6n],
+  [0xF0A5B9D5n, 0x82B2C1FBn],
+  [0x06064CF3n, 0xFA51A3DAn],
+  [0xDA79FA60n, 0x207CC464n],
+  [0xBED20560n, 0x3C3C74F3n],
+  [0x89F9C9F8n, 0xD2D14B61n],
+  [0x35FA38C6n, 0xBB04A2C1n],
+  [0xCB49E3C6n, 0xC5626167n],
+]
+
+export const SHA256_ADJUSTMENT: bigint = 0xc9dc06a7n
+export const SHA256_SIGMA0_ADJUSTMENT: bigint = 0x059c0b80n
+export const SHA256_SIGMA1_ADJUSTMENT: bigint = 0x000b92c0n
+export const CS64_FACTOR: bigint = 0x82893933n
+export const CS64_ADJUSTMENT0: bigint = 0xf2f90b1an
+export const CS64_ADJUSTMENT1: bigint = 0x0b1a0000n
+
+export const SHA256_INITIAL: bigint[] = [0x6A09E667n, 0xBB67AE85n, 0x3C6EF372n, 0xA54FF53An, 0x510E527Fn, 0x9B05688Cn, 0x1F83D9ABn, 0x5BE0CD19n]
+export const SHA256_STATE: bigint[] = [0xFD9FBEA2n, 0x91243CE7n, 0xBE499094n, 0xCD2E1E0An, 0x6C006F49n, 0x04BD35ABn, 0xFEB0A7E4n, 0x03EFFBD2n]
+
+/** Edge read-aloud trusted client token. */
+export const TRUSTED_CLIENT_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
+
+/** Chromium version edge-tts ships; also drives the Sec-MS-GEC version string. */
+export const CHROMIUM_FULL_VERSION = '143.0.3650.75'
+export const CHROMIUM_MAJOR_VERSION = CHROMIUM_FULL_VERSION.split('.')[0]
