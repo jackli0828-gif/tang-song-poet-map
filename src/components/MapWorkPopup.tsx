@@ -4,6 +4,7 @@ import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { visitorNamesAt } from '../utils/search';
 import { useSpeechState } from '../hooks/useSpeech';
+import SpeechHighlight from './SpeechHighlight';
 
 /**
  * 迭代 6 · 地图作品浮层
@@ -201,10 +202,13 @@ export default function MapWorkPopup({
                         {w.genre} · {w.yearLabel ?? `${w.year}年`}
                       </span>
                     </div>
-                    {/* 迭代 15 · 默认展开全文（用户反馈：长篇作品应直接可见全文，而非只有一段节选） */}
-                    <p className="mt-1 max-h-[60vh] whitespace-pre-line overflow-y-auto font-kai text-[14.5px] leading-[1.95] text-ink-2">
-                      {expanded && w.fullText ? w.fullText : w.excerpt}
-                    </p>
+                    {/* 迭代 15 · 默认展开全文（用户反馈：长篇作品应直接可见全文，而非只有一段节选）
+                        迭代 17 · 逐句高亮：朗读时当前句 / 词实时高亮 */}
+                    <SpeechHighlight
+                      id={w.id}
+                      text={expanded && w.fullText ? w.fullText : w.excerpt}
+                      className="mt-1 max-h-[60vh] overflow-y-auto font-kai text-[14.5px] leading-[1.95] text-ink-2"
+                    />
                     <div className="mt-1 flex items-center gap-2 text-[12.5px]">
                       <button
                         type="button"
@@ -219,7 +223,7 @@ export default function MapWorkPopup({
                         type="button"
                         onClick={() => {
                           if (speakingId === w.id) cancelSpeech();
-                          else speak(`《${w.title}》。${w.fullText ?? w.excerpt}`, w.id);
+                          else speak(w.fullText ?? w.excerpt, w.id);
                         }}
                         className={`rounded-sm border px-1.5 py-0.5 transition ${
                           speakingId === w.id

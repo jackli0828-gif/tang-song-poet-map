@@ -66,12 +66,25 @@ function escapeXml(s: string): string {
 
 /* ---------- 客户端 ---------- */
 
+/** 朗读过程中的「词 / 句」边界事件（用于逐句高亮） */
+export interface EdgeBoundary {
+  type: 'WordBoundary' | 'SentenceBoundary';
+  /** 该词 / 句的原文（Edge 逐字朗读得到的文本，用于与展示文本对齐） */
+  text: string;
+  /** 相对音频起点的偏移，单位：100 纳秒（10^7 = 1 秒） */
+  offset100ns: number;
+  /** 该词 / 句时长，单位：100 纳秒 */
+  duration100ns: number;
+}
+
 export interface EdgeSpeakOpts {
   voice?: string;
   rate?: number; // 0.1 ~ 2.0，1 为正常
   pitch?: string; // 如 '+0Hz'、'+5Hz'
   onDone?: () => void;
   onError?: (e: unknown) => void;
+  /** 逐句高亮：朗读进行中按时间顺序回调每个词 / 句边界 */
+  onBoundary?: (b: EdgeBoundary) => void;
 }
 
 export interface EdgeHandle {
@@ -107,6 +120,9 @@ export async function edgeSpeak(text: string, opts: EdgeSpeakOpts = {}): Promise
 
   const audioChunks: Uint8Array[] = [];
   let totalLen = 0;
+  // 逐句高亮：收集服务端回传的词 / 句边界（音频流全部到齐后才开始播放，故元数据已完整）
+  const boundaries: EdgeBoundary[] = [];
+  let rafId = 0;
   let ws: WebSocket | null = null;
   let audioEl: HTMLAudioElement | null = null;
   let url: string | null = null;
@@ -128,8 +144,9 @@ export async function edgeSpeak(text: string, opts: EdgeSpeakOpts = {}): Promise
         synthesis: {
           audio: {
             metadataoptions: {
-              sentenceBoundaryEnabled: 'false',
-              wordBoundaryEnabled: 'false',
+              // 开启词 / 句边界，供逐句高亮使用
+              sentenceBoundaryEnabled: 'true',
+              wordBoundaryEnabled: 'true',
             },
             outputFormat: AUDIO_FORMAT,
           },
@@ -146,6 +163,7 @@ export async function edgeSpeak(text: string, opts: EdgeSpeakOpts = {}): Promise
 
   function cleanup() {
     clearTimeout(timeout);
+    if (rafId) cancelAnimationFrame(rafId);
     if (url) URL.revokeObjectURL(url);
     audioEl?.pause();
     audioEl = null;
@@ -193,9 +211,47 @@ export async function edgeSpeak(text: string, opts: EdgeSpeakOpts = {}): Promise
     const blob = new Blob([full], { type: 'audio/mpeg' });
     url = URL.createObjectURL(blob);
     audioEl = new Audio(url);
-    audioEl.onended = () => done();
+    audioEl.onended = () => {
+      // 兜底：把剩余未触发的边界补发完，保证高亮走到结尾
+      while (bi < boundaries.length) {
+        opts.onBoundary?.(boundaries[bi]);
+        bi++;
+      }
+      running = false;
+      cancelAnimationFrame(rafId);
+      done();
+    };
     audioEl.onerror = () => fail(new Error('Edge TTS 音频解码失败'));
-    audioEl.onplaying = () => startedRes?.();
+    audioEl.onplaying = () => {
+      startedRes?.();
+      startLoop();
+    };
+    audioEl.onplay = () => startLoop();
+    audioEl.onpause = () => {
+      running = false;
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+
+    // 逐句高亮：按播放进度触发词 / 句边界回调（用 rAF 保证平滑）
+    let bi = 0;
+    let running = false;
+    const startLoop = (): void => {
+      if (running) return;
+      running = true;
+      rafId = requestAnimationFrame(tick);
+    };
+    const tick = (): void => {
+      if (!audioEl || audioEl.paused || audioEl.ended) {
+        running = false;
+        return;
+      }
+      const cur100ns = Math.floor(audioEl.currentTime * 1e7);
+      while (bi < boundaries.length && boundaries[bi].offset100ns <= cur100ns) {
+        opts.onBoundary?.(boundaries[bi]);
+        bi++;
+      }
+      rafId = requestAnimationFrame(tick);
+    };
     audioEl.play().catch((e) => fail(e));
   }
 
@@ -217,6 +273,32 @@ export async function edgeSpeak(text: string, opts: EdgeSpeakOpts = {}): Promise
       // 文本帧：含 Path: 头
       const m = /Path:\s*([^\r\n]+)/i.exec(ev.data);
       const path = m ? m[1].trim() : '';
+      if (path === 'audio.metadata') {
+        // 词 / 句边界元数据：头之后是 JSON 体
+        const sep = ev.data.indexOf('\r\n\r\n');
+        if (sep >= 0) {
+          try {
+            const json = JSON.parse(ev.data.slice(sep + 4)) as {
+              Metadata?: Array<{
+                Type: 'WordBoundary' | 'SentenceBoundary';
+                Data: { text?: { Text?: string }; offset?: number; duration?: number };
+              }>;
+            };
+            for (const item of json.Metadata ?? []) {
+              if (!item?.Data) continue;
+              boundaries.push({
+                type: item.Type,
+                text: item.Data.text?.Text ?? '',
+                offset100ns: Math.max(0, Math.floor(item.Data.offset ?? 0)),
+                duration100ns: Math.max(0, Math.floor(item.Data.duration ?? 0)),
+              });
+            }
+          } catch {
+            /* 元数据解析失败不影响音频播放 */
+          }
+        }
+        return;
+      }
       if (path === 'turn.end') finalize();
       return;
     }

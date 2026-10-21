@@ -61,7 +61,16 @@ function startKeepAlive(): void {
   }, KEEPALIVE_MS);
 }
 
-export function speak(text: string, id?: string, opts?: { rate?: number; pitch?: number }): void {
+export interface SystemSpeakOpts {
+  rate?: number;
+  pitch?: number;
+  onStart?: () => void;
+  onEnd?: () => void;
+  /** 逐句高亮：系统引擎的 boundary 事件（部分浏览器支持） */
+  onBoundary?: (e: SpeechSynthesisEvent) => void;
+}
+
+export function speak(text: string, id?: string, opts?: SystemSpeakOpts): void {
   const s = ensureSynth();
   if (!s) return;
   s.cancel();
@@ -70,11 +79,18 @@ export function speak(text: string, id?: string, opts?: { rate?: number; pitch?:
   if (zhVoice) u.voice = zhVoice;
   u.rate = opts?.rate ?? 0.95;
   u.pitch = opts?.pitch ?? 1;
+  u.onstart = () => {
+    opts?.onStart?.();
+  };
+  u.onboundary = (e) => {
+    opts?.onBoundary?.(e);
+  };
   u.onend = () => {
     if (currentId === id) {
       currentId = null;
       notify();
     }
+    opts?.onEnd?.();
     stopKeepAlive();
   };
   u.onerror = () => {
@@ -82,6 +98,7 @@ export function speak(text: string, id?: string, opts?: { rate?: number; pitch?:
       currentId = null;
       notify();
     }
+    opts?.onEnd?.();
     stopKeepAlive();
   };
   currentId = id ?? null;

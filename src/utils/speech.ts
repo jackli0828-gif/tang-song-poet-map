@@ -45,6 +45,39 @@ let currentId: string | null = null;
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach((l) => l()); }
 
+/* ---------- 逐句高亮：边界 / 起止事件 ---------- */
+
+export type SpeechBoundaryEvent =
+  | { id: string | null; type: 'start' }
+  | { id: string | null; type: 'end' }
+  | {
+      id: string | null;
+      type: 'boundary';
+      kind: 'edge' | 'system';
+      /** edge：WordBoundary / SentenceBoundary */
+      bType?: 'WordBoundary' | 'SentenceBoundary';
+      /** edge：该边界的原文（用于与展示文本对齐） */
+      text?: string;
+      offset100ns?: number;
+      duration100ns?: number;
+      /** system：boundary 事件名（'word' | 'sentence'） */
+      name?: string;
+      /** system：字符起止（UTF-16 单位，直接对应展示文本下标） */
+      charStart?: number;
+      charLen?: number;
+    };
+
+const boundaryListeners = new Set<(ev: SpeechBoundaryEvent) => void>();
+function emitBoundary(ev: SpeechBoundaryEvent): void {
+  boundaryListeners.forEach((l) => l(ev));
+}
+
+/** 订阅逐句高亮边界事件（按 id 过滤即可只关注当前作品） */
+export function subscribeBoundaries(cb: (ev: SpeechBoundaryEvent) => void): () => void {
+  boundaryListeners.add(cb);
+  return () => { boundaryListeners.delete(cb); };
+}
+
 function loadEngine(): TTSEngine {
   try {
     const v = localStorage.getItem(LS_ENGINE);
@@ -96,6 +129,10 @@ export function ttsEngineSupported(): boolean {
 /* ---------- 朗读 ---------- */
 
 export function speak(text: string, id?: string, opts?: { rate?: number }): void {
+  const prevId = currentId;
+  const emitStart = (): void => emitBoundary({ id: id ?? null, type: 'start' });
+  const emitEnd = (): void => emitBoundary({ id: id ?? null, type: 'end' });
+
   if (engine === 'edge' && edgeTtsSupported()) {
     // 先取消旧的
     if (activeEdge) {
@@ -104,6 +141,7 @@ export function speak(text: string, id?: string, opts?: { rate?: number }): void
     }
     // 取消 system（避免两者同时响）
     cancelSystem();
+    if (prevId && prevId !== id) emitBoundary({ id: prevId, type: 'end' });
 
     currentId = id ?? null;
     notify();
@@ -115,31 +153,92 @@ export function speak(text: string, id?: string, opts?: { rate?: number }): void
         activeEdge = null;
         currentId = null;
         notify();
+        emitEnd();
       },
       onError: (e) => {
         // 回退到 system
         console.warn('[TTS] Edge TTS 失败，回退系统引擎:', e);
         activeEdge = null;
-        speakSystem(text, id, { rate: opts?.rate ?? 0.95 });
+        emitEnd();
+        speakSystem(text, id, {
+          rate: opts?.rate ?? 0.95,
+          onStart: emitStart,
+          onEnd: emitEnd,
+          onBoundary: (ev) =>
+            emitBoundary({
+              id: id ?? null,
+              type: 'boundary',
+              kind: 'system',
+              name: ev.name,
+              charStart: ev.charIndex,
+              charLen: ev.charLength,
+            }),
+        });
       },
-    }).then((handle) => {
-      activeEdge = handle;
-    }).catch((e) => {
-      console.warn('[TTS] edgeSpeak 启动失败:', e);
-      activeEdge = null;
-      speakSystem(text, id, { rate: opts?.rate ?? 0.95 });
-    });
+      onBoundary: (b) => {
+        emitBoundary({
+          id: id ?? null,
+          type: 'boundary',
+          kind: 'edge',
+          bType: b.type,
+          text: b.text,
+          offset100ns: b.offset100ns,
+          duration100ns: b.duration100ns,
+        });
+      },
+    })
+      .then((handle) => {
+        activeEdge = handle;
+        handle.started
+          .then(() => emitStart())
+          .catch(() => {
+            /* 启动失败已走 onError 回退 */
+          });
+      })
+      .catch((e) => {
+        console.warn('[TTS] edgeSpeak 启动失败:', e);
+        activeEdge = null;
+        speakSystem(text, id, {
+          rate: opts?.rate ?? 0.95,
+          onStart: emitStart,
+          onEnd: emitEnd,
+          onBoundary: (ev) =>
+            emitBoundary({
+              id: id ?? null,
+              type: 'boundary',
+              kind: 'system',
+              name: ev.name,
+              charStart: ev.charIndex,
+              charLen: ev.charLength,
+            }),
+        });
+      });
     return;
   }
 
   // system 引擎（或 edge 不可用）
   cancelSystem();
+  if (prevId && prevId !== id) emitBoundary({ id: prevId, type: 'end' });
   currentId = id ?? null;
-  speakSystem(text, id, opts);
+  speakSystem(text, id, {
+    rate: opts?.rate ?? 0.95,
+    onStart: emitStart,
+    onEnd: emitEnd,
+    onBoundary: (ev) =>
+      emitBoundary({
+        id: id ?? null,
+        type: 'boundary',
+        kind: 'system',
+        name: ev.name,
+        charStart: ev.charIndex,
+        charLen: ev.charLength,
+      }),
+  });
   notify();
 }
 
 export function cancelSpeech(): void {
+  const endedId = currentId;
   if (activeEdge) {
     activeEdge.cancel();
     activeEdge = null;
@@ -147,6 +246,7 @@ export function cancelSpeech(): void {
   cancelSystem();
   currentId = null;
   notify();
+  if (endedId) emitBoundary({ id: endedId, type: 'end' });
 }
 
 export function speakingId(): string | null {

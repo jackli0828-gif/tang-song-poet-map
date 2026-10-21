@@ -3,6 +3,7 @@ import { useApp, useAppDispatch, useAppState } from '../store/PoetContext';
 import { EVENT_LABEL, type LifeNode, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { useSpeechState } from '../hooks/useSpeech';
+import SpeechHighlight from './SpeechHighlight';
 
 interface Row {
   work: Work;
@@ -178,11 +179,13 @@ export default function WorksGallery(): JSX.Element {
                       <span>·</span>
                       <span>年 {ageAt(row.work.year, primaryPoet.birthYear)}</span>
                     </div>
-                    <p className={`mt-1.5 whitespace-pre-line font-kai text-[15.5px] leading-[1.9] text-ink-2 ${
-                      expanded ? 'max-h-[60vh] overflow-y-auto' : ''
-                    }`}>
-                      {expanded && row.work.fullText ? row.work.fullText : row.work.excerpt}
-                    </p>
+                    <SpeechHighlight
+                      id={row.work.id}
+                      text={expanded && row.work.fullText ? row.work.fullText : row.work.excerpt}
+                      className={`mt-1.5 font-kai text-[15.5px] leading-[1.9] text-ink-2 ${
+                        expanded ? 'max-h-[60vh] overflow-y-auto' : ''
+                      }`}
+                    />
                     <div className="mt-1.5 flex items-center gap-2 text-[11px]">
                       <button
                         type="button"
@@ -202,7 +205,7 @@ export default function WorksGallery(): JSX.Element {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (speakingId === row.work.id) cancelSpeech();
-                          else speak(`《${row.work.title}》。${row.work.fullText ?? row.work.excerpt}`, row.work.id);
+                          else speak(row.work.fullText ?? row.work.excerpt, row.work.id);
                         }}
                         className={`rounded-sm border px-1.5 py-0.5 transition ${
                           speakingId === row.work.id

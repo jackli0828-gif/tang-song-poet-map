@@ -3,6 +3,8 @@ import { useAppState, useAppDispatch } from '../store/PoetContext';
 import { POET_MAP } from '../data/poets';
 import { type Poet, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
+import { useSpeechState } from '../hooks/useSpeech';
+import SpeechHighlight from './SpeechHighlight';
 
 /**
  * 迭代 16 · 作品全文放大页
@@ -61,6 +63,8 @@ export default function WorkFullscreen(): JSX.Element | null {
   const { poet, work } = ctx;
   const node = poet.nodes[ctx.nodeIndex];
   const body = work.fullText ?? work.excerpt;
+  // 迭代 17 · 全文放大页支持朗读 + 逐句高亮
+  const { speak, cancelSpeech, speakingId } = useSpeechState();
 
   return (
     <div
@@ -124,6 +128,22 @@ export default function WorkFullscreen(): JSX.Element | null {
 
           <button
             type="button"
+            onClick={() => {
+              if (speakingId === work.id) cancelSpeech();
+              else speak(body, work.id);
+            }}
+            className={`rounded-sm border px-2 py-0.5 text-[13px] transition ${
+              speakingId === work.id
+                ? 'border-cinnabar bg-cinnabar text-paper'
+                : 'border-cinnabar/50 text-cinnabar hover:bg-cinnabar/10'
+            }`}
+            title={speakingId === work.id ? '停止朗读' : '朗读全文（逐句高亮）'}
+          >
+            {speakingId === work.id ? '🔊 朗读中' : '🔊 朗读'}
+          </button>
+
+          <button
+            type="button"
             onClick={close}
             className="ml-auto rounded-sm border border-ink-4/40 px-2 py-0.5 text-[13px] text-ink-2 transition hover:bg-paper-3"
             title="关闭（Esc）"
@@ -160,7 +180,12 @@ export default function WorkFullscreen(): JSX.Element | null {
                 ) : null}
               </header>
 
-              <div className="mt-4 whitespace-pre-line font-kai text-ink-2">{body}</div>
+              {/* 迭代 17 · 逐句高亮（朗读时当前句 / 词实时高亮） */}
+              <SpeechHighlight
+                id={work.id}
+                text={body}
+                className="mt-4 font-kai text-ink-2"
+              />
 
               {work.tags && work.tags.length > 0 ? (
                 <div className="mt-5 flex flex-wrap gap-1.5 text-[0.75em]">
