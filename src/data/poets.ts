@@ -21,7 +21,6 @@ import { POETS_S3 } from './poets-s3';
 import { POETS_T4 } from './poets-t4';
 import { POETS_S4 } from './poets-s4';
 import { POETS_X1 } from './poets-x1';
-import { applyWorksAdd } from './works-add';
 
 export const POETS: Poet[] = [
   /* ======================================================= 唐 · 李白 */
@@ -5586,7 +5585,7 @@ export const POETS: Poet[] = [
  * 在此统一并入对应时空节点（原辞典未系年者按节点轮转挂载，
  * background 已注明「系年与地点待考」）。
  */
-export const WORKS_ADD_COUNT = applyWorksAdd(POETS);
+let WORKS_ADD_COUNT = 0;
 
 /**
  * 辞典补录作品 · 地点/系年回填
@@ -5595,8 +5594,7 @@ export const WORKS_ADD_COUNT = applyWorksAdd(POETS);
  * 这里再用辞典赏析里明指的真正创作地/系年回填（work-plink.ts），
  * 让作品落到正确的时空点上。必须先于 POET_MAP 构造执行。
  */
-import { applyWorkPlink } from './work-plink';
-export const WORK_PLINK_COUNT = applyWorkPlink(POETS);
+let WORK_PLINK_COUNT = 0;
 
 /** id → 诗人 */
 export const POET_MAP: Record<string, Poet> = POETS.reduce(
@@ -5606,6 +5604,66 @@ export const POET_MAP: Record<string, Poet> = POETS.reduce(
   },
   {} as Record<string, Poet>,
 );
+
+/* ==================================================================
+ * 迭代 17 · 性能裁剪：补充语料异步分块加载
+ * ==================================================================
+ * works-add.ts（约 1.2 MB）+ work-plink.ts（约 0.2 MB）合计占整个产物
+ * 的三分之一以上，但它们只是「辞典补录」的追加语料 —— 并非首屏必需。
+ * 改为动态 import 后：
+ *   - 主 chunk 体积大幅下降，首屏解析 / 可交互时间提前；
+ *   - 这两个语料成为独立 chunk，浏览器可并行下载且长期命中缓存
+ *     （业务代码更新时不必重下）。
+ *
+ * 正确性要点：
+ *   1. applyWorksAdd / applyWorkPlink 是原地改写 POETS 的副作用函数，
+ *      对象身份不变会让依赖 [primaryPoet] 的 useMemo 不重算 → 因此并入后
+ *      必须刷新一批「新身份」（见 refreshIdentities），让 React 自然重算。
+ *   2. 索引（ALL_WORKS / 节点数）原先在模块加载时一次性算好，现在必须
+ *      延迟到首次访问才建，并在补充并入后重建，否则顶栏统计会停在旧值。
+ *   3. 用版本号 + 订阅通知 useSyncExternalStore，驱动已挂载组件重渲染。
+ * ================================================================== */
+
+let supplementLoaded = false;
+let supplementVersion = 0;
+const supplementListeners = new Set<() => void>();
+let loadingPromise: Promise<void> | null = null;
+
+/** 订阅补充语料并入事件（并入后返回新的版本号） */
+export function subscribeSupplement(cb: () => void): () => void {
+  supplementListeners.add(cb);
+  return () => {
+    supplementListeners.delete(cb);
+  };
+}
+
+/** 当前版本号（每次并入 +1），供 useSyncExternalStore 做快照 */
+export function getSupplementVersion(): number {
+  return supplementVersion;
+}
+
+export function isSupplementLoaded(): boolean {
+  return supplementLoaded;
+}
+
+/** 异步加载并并入「辞典补录」语料；可重复调用，只执行一次 */
+export function loadSupplements(): Promise<void> {
+  if (loadingPromise) return loadingPromise;
+  loadingPromise = (async () => {
+    const [{ applyWorksAdd }, { applyWorkPlink }] = await Promise.all([
+      import('./works-add'),
+      import('./work-plink'),
+    ]);
+    WORKS_ADD_COUNT = applyWorksAdd(POETS);
+    WORK_PLINK_COUNT = applyWorkPlink(POETS);
+    buildIndex(); // 重建索引，避免统计停留在补充前
+    supplementLoaded = true;
+    supplementVersion += 1;
+    // 通知订阅者（App 据此重挂载数据子树，让新并入的作品进入界面）
+    supplementListeners.forEach((cb) => cb());
+  })();
+  return loadingPromise;
+}
 
 /** 全部作品（按创作年份升序），含诗人归属 */
 export interface WorkRef {
@@ -5617,18 +5675,40 @@ export interface WorkRef {
   placeId: string;
 }
 
-export const ALL_WORKS: WorkRef[] = POETS.flatMap((p) =>
-  p.nodes.flatMap((n) =>
-    n.works.map((w) => ({
-      poetId: p.id,
-      poetName: p.name,
-      workId: w.id,
-      title: w.title,
-      year: w.year,
-      placeId: w.placeId,
-    })),
-  ),
-).sort((a, b) => a.year - b.year);
+let allWorksCache: WorkRef[] | null = null;
+let nodesCache = -1;
+
+/**
+ * 构建 / 重建作品与节点索引。
+ * 迭代 17 · 性能裁剪：补充数据是异步并入的，索引必须延迟到首次访问时才建，
+ * 且在补充并入后由 loadSupplements() 调 buildIndex(true) 失效重建，
+ * 避免顶栏统计停留在「补充前」的旧数字。
+ */
+function buildIndex(): void {
+  allWorksCache = POETS.flatMap((p) =>
+    p.nodes.flatMap((n) =>
+      n.works.map((w) => ({
+        poetId: p.id,
+        poetName: p.name,
+        workId: w.id,
+        title: w.title,
+        year: w.year,
+        placeId: w.placeId,
+      })),
+    ),
+  ).sort((a, b) => a.year - b.year);
+  nodesCache = POETS.reduce((s, p) => s + p.nodes.length, 0);
+}
+
+function ensureIndex(): void {
+  if (!allWorksCache) buildIndex();
+}
+
+/** 全部作品（按创作年份升序），含诗人归属 */
+export function getAllWorks(): WorkRef[] {
+  ensureIndex();
+  return allWorksCache as WorkRef[];
+}
 
 /** 数据统计（用于页脚展示）
  *  注意 worksAdd 一项不可删除：WORKS_ADD_COUNT 是 applyWorksAdd(POETS) 的
@@ -5636,11 +5716,11 @@ export const ALL_WORKS: WorkRef[] = POETS.flatMap((p) =>
  *  applyWorksAdd 的副作用一起 tree-shake 掉，1200 余篇辞典补录作品将不进
  *  入产物（esbuild 的校验脚本不做 tree-shake，因此看不出来）。 */
 export const DATA_STATS = {
-  poets: POETS.length,
-  tang: POETS.filter((p) => p.dynasty === '唐').length,
-  song: POETS.filter((p) => p.dynasty === '宋').length,
-  nodes: POETS.reduce((s, p) => s + p.nodes.length, 0),
-  works: ALL_WORKS.length,
-  worksAdd: WORKS_ADD_COUNT,
-  workPlink: WORK_PLINK_COUNT,
+  get poets(): number { return POETS.length; },
+  get tang(): number { return POETS.filter((p) => p.dynasty === '唐').length; },
+  get song(): number { return POETS.filter((p) => p.dynasty === '宋').length; },
+  get nodes(): number { ensureIndex(); return nodesCache; },
+  get works(): number { ensureIndex(); return (allWorksCache as WorkRef[]).length; },
+  get worksAdd(): number { return WORKS_ADD_COUNT; },
+  get workPlink(): number { return WORK_PLINK_COUNT; },
 };

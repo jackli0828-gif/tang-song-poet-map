@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useAppState, useAppDispatch, yearOf } from './store/PoetContext';
+import { loadSupplements } from './data/poets';
 import { activeNodeIndex } from './utils/geo';
 import TopBar from './components/TopBar';
 import GuideOverlay, { hasOnboarded, type GuideMode } from './components/GuideOverlay';
@@ -96,6 +97,21 @@ export default function App(): JSX.Element {
   const state = useAppState();
   const dispatch = useAppDispatch();
 
+  // 迭代 17 · 性能裁剪：挂载后立即（但不阻塞）拉取「辞典补录」语料分块。
+  // 这批数据约占产物三分之一体积，独立成 chunk 后首屏不必等它解析完。
+  // 并入完成后 dataVersion +1，使承载数据的子树重挂载一次，
+  // 让新并入的作品与统计数字进入界面（比逐个刷新对象身份更稳、更简单）。
+  const [dataVersion, setDataVersion] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    loadSupplements().then(() => {
+      if (!cancelled) setDataVersion((v) => v + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // 迭代 9 · 轮次 3：首访自动弹出三步引导；顶栏「?」或 ? 键唤出速查表
   const [guide, setGuide] = useState<GuideMode>(null);
   useEffect(() => {
@@ -149,9 +165,9 @@ export default function App(): JSX.Element {
   return (
     <div ref={rootRef} className="paper-bg flex h-full flex-col overflow-hidden text-ink">
       {/* 迭代 12：全屏模式下隐藏顶栏，把整屏让给地图 */}
-      {!state.mapFullscreen ? <TopBar onOpenHelp={() => setGuide('help')} /> : null}
+      {!state.mapFullscreen ? <TopBar key={`top-${dataVersion}`} onOpenHelp={() => setGuide('help')} /> : null}
 
-      <div className="flex min-h-0 flex-1">
+      <div key={`row-${dataVersion}`} className="flex min-h-0 flex-1">
         {/* 迭代 17 · 左侧名录抽屉：宽屏（≥md）始终可见；窄屏（<md）默认收起，
             点左下角浮标可展开（左侧滑入）；右上角有 ✕ 关闭 */}
         {!state.mapFullscreen ? (

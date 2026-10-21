@@ -48,11 +48,23 @@ rm -f .index.root.html.bak
 echo "--- 根目录 index.html 引用 ---"
 grep -o 'assets/index-[A-Za-z0-9_-]*\.js' index.html
 echo "--- 产物自检（应与 DATA_STATS 一致）---"
+# 迭代 17：辞典补录语料（works-add / work-plink）已改为动态 import 的异步 chunk，
+# 不再出现在主包里 —— 自检必须把主包与异步 chunk 合并统计，否则会误报「数据丢失」。
 node -e "
 const fs=require('fs');
-const f=fs.readdirSync('assets').find(x=>x.startsWith('index-')&&x.endsWith('.js'));
-const s=fs.readFileSync('assets/'+f,'utf8');
-const n=k=>s.split(k).length-1;
-console.log(f);
-console.log('  诗人条目 dynasty:', n('dynasty:'), '| 追加作品 -wa:', n('-wa'), '| 作品 excerpt:', n('excerpt:'));
+const files=fs.readdirSync('assets');
+const main=files.find(x=>x.startsWith('index-')&&x.endsWith('.js'));
+const chunks=files.filter(x=>x.endsWith('.js')&&!x.startsWith('index-')&&!x.startsWith('react')&&!x.startsWith('d3'));
+const n=(s,k)=>s.split(k).length-1;
+const sm=fs.readFileSync('assets/'+main,'utf8');
+let wa=n(sm,'-wa'), ex=n(sm,'excerpt:');
+console.log('主包 '+main);
+console.log('  诗人条目 dynasty:', n(sm,'dynasty:'), '| 主包内作品 excerpt:', ex);
+for(const c of chunks){
+  const s=fs.readFileSync('assets/'+c,'utf8');
+  const w=n(s,'-wa'), e=n(s,'excerpt:');
+  wa+=w; ex+=e;
+  console.log('  异步块 '+c+' : -wa '+w+' , excerpt '+e);
+}
+console.log('合并统计 => -wa', wa, '| excerpt', ex, '(应分别 ≈1220 / ≈2066)');
 "
