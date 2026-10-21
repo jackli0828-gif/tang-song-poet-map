@@ -12,8 +12,34 @@
   color-scheme: light;
   --paper: #f5efe1;
   --paper-2: #efe7d6;
+  --paper-3: #e6dcc7;
   --ink: #2b2724;
+  --ink-2: #4a443c;
+  --ink-3: #6e665b;
+  --ink-4: #9a9186;
   --cinnabar: #a83232;
+  --cinnabar-2: #c25b4a;
+  --azurite: #3a6ea5;
+  --malachite: #4f7c5a;
+  --gold: #b28a3c;
+}
+
+/* 迭代 17 · 深色模式：墨色绢底 + 暖象牙文字，朱砂保持不变
+   通过 Tailwind 的 var() 映射，所有 bg-paper / text-ink 等工具类自动翻转 */
+:root.dark {
+  color-scheme: dark;
+  --paper: #16181d;
+  --paper-2: #1f2329;
+  --paper-3: #2a3138;
+  --ink: #ece6d8;
+  --ink-2: #d4ccbc;
+  --ink-3: #a89f8f;
+  --ink-4: #766f63;
+  --cinnabar: #c05248;
+  --cinnabar-2: #d9705f;
+  --azurite: #5a93c9;
+  --malachite: #6fa07d;
+  --gold: #c89f54;
 }
 
 html,
@@ -40,6 +66,14 @@ body {
     repeating-linear-gradient(135deg, rgba(120, 105, 80, 0.035) 0px, rgba(120, 105, 80, 0.035) 1px, transparent 1px, transparent 7px);
 }
 
+/* 迭代 17 · 深色模式下的宣纸纤维底纹：暗绢 + 更淡的斜纹（与深色变量协调） */
+:root.dark .paper-bg {
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(200, 159, 84, 0.06), transparent 45%),
+    radial-gradient(circle at 82% 78%, rgba(90, 147, 201, 0.05), transparent 45%),
+    repeating-linear-gradient(135deg, rgba(236, 230, 216, 0.025) 0px, rgba(236, 230, 216, 0.025) 1px, transparent 1px, transparent 7px);
+}
+
 /* 竖向排版的标题 */
 .vertical-title {
   writing-mode: vertical-rl;
@@ -62,10 +96,13 @@ body {
   opacity: 0.92;
 }
 
-/* 细滚动条 */
+/* 细滚动条（迭代 17 · 随主题变量翻转） */
 * {
   scrollbar-width: thin;
   scrollbar-color: rgba(110, 102, 91, 0.35) transparent;
+}
+:root.dark * {
+  scrollbar-color: rgba(236, 230, 216, 0.3) transparent;
 }
 *::-webkit-scrollbar {
   width: 7px;
@@ -74,6 +111,9 @@ body {
 *::-webkit-scrollbar-thumb {
   background: rgba(110, 102, 91, 0.32);
   border-radius: 999px;
+}
+:root.dark *::-webkit-scrollbar-thumb {
+  background: rgba(236, 230, 216, 0.28);
 }
 *::-webkit-scrollbar-track {
   background: transparent;
@@ -93,6 +133,9 @@ input[type='range'].ink-range::-webkit-slider-runnable-track {
   background: linear-gradient(90deg, rgba(43, 39, 36, 0.55), rgba(43, 39, 36, 0.2));
   border-radius: 999px;
 }
+:root.dark input[type='range'].ink-range::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, rgba(236, 230, 216, 0.45), rgba(236, 230, 216, 0.15));
+}
 input[type='range'].ink-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -100,20 +143,23 @@ input[type='range'].ink-range::-webkit-slider-thumb {
   height: 16px;
   margin-top: -6.5px;
   border-radius: 50%;
-  background: #f5efe1;
+  background: var(--paper);
   border: 2px solid var(--cinnabar);
-  box-shadow: 0 1px 3px rgba(43, 39, 36, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 input[type='range'].ink-range::-moz-range-track {
   height: 3px;
   background: rgba(43, 39, 36, 0.35);
   border-radius: 999px;
 }
+:root.dark input[type='range'].ink-range::-moz-range-track {
+  background: rgba(236, 230, 216, 0.3);
+}
 input[type='range'].ink-range::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #f5efe1;
+  background: var(--paper);
   border: 2px solid var(--cinnabar);
 }
 
@@ -166,6 +212,36 @@ input[type='range'].ink-range::-moz-range-thumb {
     inset 0 0 0 6px rgba(239, 231, 214, 0.75),
     inset 0 0 22px rgba(43, 39, 36, 0.07);
 }
+/* 迭代 17 · 深色模式：卷轴装裱改用暗绢内阴影 */
+:root.dark .scroll-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(42, 49, 56, 0.85),
+    inset 0 0 0 6px rgba(31, 35, 41, 0.85),
+    inset 0 0 22px rgba(0, 0, 0, 0.35);
+}
+
+/* 作品卡悬停：朱砂描边 + 微微抬起，呼应水墨的「落笔」感 */
+.work-card {
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
+}
+.work-card:hover {
+  border-color: rgba(168, 50, 50, 0.55);
+  box-shadow: 0 2px 10px rgba(43, 39, 36, 0.09);
+  transform: translateY(-1px);
+}
+:root.dark .work-card:hover {
+  border-color: rgba(192, 82, 72, 0.55);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* 迭代 17 · 深色模式：印章 / 方印 略调（保持朱砂色，仅与暗底协调） */
+:root.dark .seal,
+:root.dark .seal-square {
+  opacity: 0.95;
+}
 
 /* 云纹分隔线：中段实、两端渐隐，用于栏目标题前的小分隔 */
 .rule-cloud {
@@ -213,6 +289,10 @@ input[type='range'].ink-range::-moz-range-thumb {
   border-color: rgba(168, 50, 50, 0.55);
   box-shadow: 0 2px 10px rgba(43, 39, 36, 0.09);
   transform: translateY(-1px);
+}
+:root.dark .work-card:hover {
+  border-color: rgba(192, 82, 72, 0.55);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
 }
 
 /* 栏目标题：宋体 + 加宽字距，强化古籍版式感 */

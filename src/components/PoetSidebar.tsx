@@ -16,11 +16,7 @@ export default function PoetSidebar(): JSX.Element {
   const list = useFilteredPoets();
 
   return (
-    <aside
-      className={`flex h-full shrink-0 flex-col border-r border-ink-4/40 bg-paper-2 transition-all ${
-        state.sidebarOpen ? 'w-[160px]' : 'w-0 overflow-hidden'
-      }`}
-    >
+    <aside className="flex h-full w-full flex-col border-r border-ink-4/40 bg-paper-2 transition-all">
       <div className="flex items-center justify-between px-3 py-2 text-[13px] text-ink-3">
         <span>
           诗人词人

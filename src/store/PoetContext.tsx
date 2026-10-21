@@ -55,6 +55,10 @@ export interface AppState {
   bgmOn: boolean;
   /** 迭代 16：当前在「全文放大页」中展示的作品 id（null 表示未打开） */
   openWorkId: string | null;
+  /** 迭代 17：移动端右栏是否抽屉展开（仅 < md 视口生效；宽屏右栏始终可见） */
+  rightPanelOpen: boolean;
+  /** 迭代 17：移动端名录抽屉是否展开（仅 < md 视口生效；宽屏始终可见） */
+  sidebarDrawerOpen: boolean;
 }
 
 export type AppAction =
@@ -97,7 +101,11 @@ export type AppAction =
   /** 迭代 12：切换古韵背景音乐 */
   | { type: 'TOGGLE_BGM' }
   /** 迭代 16：打开 / 关闭「作品全文放大页」 */
-  | { type: 'OPEN_WORK_FULL'; workId: string | null };
+  | { type: 'OPEN_WORK_FULL'; workId: string | null }
+  /** 迭代 17：移动端右栏抽屉开关（宽屏忽略） */
+  | { type: 'SET_RIGHT_PANEL'; open: boolean }
+  /** 迭代 17：移动端名录抽屉开关（宽屏忽略） */
+  | { type: 'SET_SIDEBAR_DRAWER'; open: boolean };
 
 const MAX_COMPARE = 3;
 
@@ -133,6 +141,10 @@ export const initialState: AppState = {
   bgmOn: true,
   // 迭代 16：全文放大页默认关闭
   openWorkId: null,
+  // 迭代 17：移动端右栏默认收起（让位地图，用户可一键展开）
+  rightPanelOpen: false,
+  // 迭代 17：移动端名录默认收起（让位地图，用户可一键展开）
+  sidebarDrawerOpen: false,
 };
 
 /** 依据诗人 id 取当前年份（回退到出生年） */
@@ -369,6 +381,12 @@ function reducer(state: AppState, action: AppAction): AppState {
     // 迭代 16：作品全文放大页
     case 'OPEN_WORK_FULL':
       return { ...state, openWorkId: action.workId };
+    // 迭代 17：移动端右栏抽屉
+    case 'SET_RIGHT_PANEL':
+      return { ...state, rightPanelOpen: action.open };
+    // 迭代 17：移动端名录抽屉
+    case 'SET_SIDEBAR_DRAWER':
+      return { ...state, sidebarDrawerOpen: action.open };
     default:
       return state;
   }

@@ -152,29 +152,52 @@ export default function App(): JSX.Element {
       {!state.mapFullscreen ? <TopBar onOpenHelp={() => setGuide('help')} /> : null}
 
       <div className="flex min-h-0 flex-1">
-        {/* 迭代 12：全屏模式下隐藏诗人名录及其展开把手 */}
-        {!state.mapFullscreen ? <PoetSidebar /> : null}
-
+        {/* 迭代 17 · 左侧名录抽屉：宽屏（≥md）始终可见；窄屏（<md）默认收起，
+            点左下角浮标可展开（左侧滑入）；右上角有 ✕ 关闭 */}
         {!state.mapFullscreen ? (
-          !state.sidebarOpen ? (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-              className="shrink-0 border-r border-ink-4/40 bg-paper-2/60 px-1 text-[12px] text-ink-3 transition hover:bg-paper-3"
-              title="展开诗人名录"
-            >
-              <span className="vertical-title mx-auto">名录</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-              className="absolute left-[244px] top-[64px] z-10 -ml-px hidden rounded-r-sm border border-l-0 border-ink-4/40 bg-paper-2 px-1 py-2 text-[11px] text-ink-3 hover:bg-paper-3 lg:block"
-              title="收起诗人名录"
-            >
-              ‹
-            </button>
-          )
+          <aside
+            className={`h-full shrink-0 border-r border-ink-4/40 bg-paper/95 backdrop-blur-sm transition-transform duration-300 md:bg-paper-2/60 md:translate-x-0 ${
+              state.sidebarDrawerOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            }`}
+          >
+            <div className="h-full w-[160px] md:w-[244px] xl:w-[244px]">
+              <PoetSidebar />
+            </div>
+          </aside>
+        ) : null}
+
+        {/* 迭代 17 · 左侧名录抽屉浮标（左下角，宽屏隐藏；与右栏抽屉互斥：打开任一侧自动关另一侧） */}
+        {!state.mapFullscreen ? (
+          <button
+            type="button"
+            onClick={() => {
+              dispatch({ type: 'SET_SIDEBAR_DRAWER', open: !state.sidebarDrawerOpen });
+              // 抽屉互斥：打开左侧自动关右侧（避免双栏挤爆）
+              if (!state.sidebarDrawerOpen && state.rightPanelOpen) {
+                dispatch({ type: 'SET_RIGHT_PANEL', open: false });
+              }
+            }}
+            className={`fixed bottom-4 left-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-ink-4/40 bg-paper text-[15px] text-ink-2 shadow-popup transition md:hidden ${
+              state.sidebarDrawerOpen ? 'hidden' : ''
+            }`}
+            title={state.sidebarDrawerOpen ? '收起诗人名录' : '展开诗人名录'}
+            aria-label={state.sidebarDrawerOpen ? '收起诗人名录' : '展开诗人名录'}
+          >
+            {state.sidebarDrawerOpen ? '‹' : '名录'}
+          </button>
+        ) : null}
+
+        {/* 迭代 17 · 左侧名录抽屉关闭把手（右上角，仅窄屏 + 打开时显示） */}
+        {!state.mapFullscreen && state.sidebarDrawerOpen ? (
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'SET_SIDEBAR_DRAWER', open: false })}
+            className="fixed left-3 top-3 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-ink-4/40 bg-paper text-[16px] text-ink-3 shadow-popup transition md:hidden"
+            title="收起诗人名录"
+            aria-label="收起诗人名录"
+          >
+            ✕
+          </button>
         ) : null}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -188,13 +211,48 @@ export default function App(): JSX.Element {
           <Timeline />
         </main>
 
-        {/* 迭代 3 · 响应式：窄屏收窄右面板，宽屏恢复 400px；迭代 12：全屏模式下隐藏 */}
+        {/* 迭代 17 · 移动端右栏抽屉：宽屏（≥md）始终可见；窄屏（<md）
+            默认收起让位地图，点右下角浮标可展开抽屉（右侧滑入） */}
         {!state.mapFullscreen ? (
-          <aside className="h-full w-[320px] shrink-0 border-l border-ink-4/40 bg-paper/60 xl:w-[400px]">
-            <RightPanel />
+          <aside
+            className={`h-full shrink-0 border-l border-ink-4/40 bg-paper/95 backdrop-blur-sm transition-transform duration-300 md:bg-paper/60 md:translate-x-0 ${
+              state.rightPanelOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
+            }`}
+          >
+            <div className="h-full w-[320px] xl:w-[400px]">
+              <RightPanel />
+            </div>
           </aside>
         ) : null}
       </div>
+
+      {/* 迭代 17 · 移动端右栏抽屉浮标（右下角，宽屏隐藏） */}
+      {!state.mapFullscreen ? (
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'SET_RIGHT_PANEL', open: !state.rightPanelOpen })}
+          className={`fixed bottom-4 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-ink-4/40 bg-paper text-[15px] text-ink-2 shadow-popup transition md:hidden ${
+            state.rightPanelOpen ? 'hidden' : ''
+          }`}
+          title={state.rightPanelOpen ? '收起作品面板' : '展开作品面板'}
+          aria-label={state.rightPanelOpen ? '收起作品面板' : '展开作品面板'}
+        >
+          {state.rightPanelOpen ? '‹' : '作品'}
+        </button>
+      ) : null}
+
+      {/* 迭代 17 · 移动端抽屉关闭把手（右上角，仅窄屏 + 打开时显示） */}
+      {!state.mapFullscreen && state.rightPanelOpen ? (
+        <button
+          type="button"
+          onClick={() => dispatch({ type: 'SET_RIGHT_PANEL', open: false })}
+          className="fixed right-3 top-3 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-ink-4/40 bg-paper text-[16px] text-ink-3 shadow-popup transition md:hidden"
+          title="收起作品面板"
+          aria-label="收起作品面板"
+        >
+          ✕
+        </button>
+      ) : null}
 
       {/* 迭代 9：首屏引导 / 快捷键速查（同一遮罩，两种模式） */}
       <GuideOverlay

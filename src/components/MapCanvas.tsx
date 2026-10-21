@@ -674,22 +674,99 @@ export default function MapCanvas(): JSX.Element {
     return () => el.removeEventListener('wheel', onWheel);
   }, [clampView]);
 
+  /* 移动端 · 双指捏合缩放 + 单指拖拽（迭代 17）
+   * 设计原则：
+   *  - 单一指针：按下→拖拽平移（与旧行为一致）
+   *  - 双指同时按下：取消拖拽，记录捏合起点（两指中点 + 起点距离），
+   *    在 move 时按距离比放大 k，并让中点保持视觉位置不变（避免捏合时画面跳）。
+   *  - 任一指抬起：若仍有 1 指保留，则把剩余那根作为新的拖拽起点（无缝继续）。
+   * 使用 PointerEvent API（兼容 touch 与 mouse），不依赖浏览器 pinch-zoom 原生事件，
+   * 保证跨设备一致。
+   */
+  const activePointerIds = useRef<number[]>([]);
+  // 双指捏合起始：两指中点（屏幕坐标）+ 起点距离 + 当时的变换（k/offset）
+  const pinchStart = useRef<{
+    x: number;
+    y: number;
+    dist0: number;
+    k0: number;
+    tx0: number;
+    ty0: number;
+  } | null>(null);
+
   const onPointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>): void => {
       if (e.button !== 0) return;
-      dragRef.current = { x: e.clientX, y: e.clientY, tx: transform.x, ty: transform.y };
+      activePointerIds.current.push(e.pointerId);
+      const active = activePointerIds.current;
+      if (active.length === 2) {
+        // 双指按下：取消单指拖拽，等 move 时记录捏合起点
+        pinchStart.current = null;
+      } else if (active.length === 1) {
+        dragRef.current = {
+          x: e.clientX,
+          y: e.clientY,
+          tx: transform.x,
+          ty: transform.y,
+        };
+      }
       (e.target as Element).setPointerCapture?.(e.pointerId);
     },
     [transform.x, transform.y],
   );
 
   const dragRef = useRef<{ x: number; y: number; tx: number; ty: number } | null>(null);
+  // 双指 move：需要追踪两根指的位置；存到 ref 以便从 e.target 获取
+  const pointerPositions = useRef<Map<number, { x: number; y: number }>>(new Map());
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>): void => {
+      pointerPositions.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      const activeIds = activePointerIds.current;
+      if (activeIds.length >= 2) {
+        // 双指捏合
+        setAnimating(false);
+        const positions: { x: number; y: number }[] = [];
+        for (const pid of activeIds) {
+          const p = pointerPositions.current.get(pid);
+          if (p) positions.push(p);
+        }
+        if (positions.length < 2) return;
+        const midX = (positions[0].x + positions[1].x) / 2;
+        const midY = (positions[0].y + positions[1].y) / 2;
+        const distNow = Math.hypot(positions[0].x - positions[1].x, positions[0].y - positions[1].y);
+
+        // 第一次双指 move 时初始化 pinchStart（记录当时的变换 + 中点 + 距离）
+        if (!pinchStart.current) {
+          pinchStart.current = {
+            x: midX,
+            y: midY,
+            dist0: distNow,
+            k0: transform.k,
+            tx0: transform.x,
+            ty0: transform.y,
+          };
+          return;
+        }
+
+        const { k0, dist0, x: sx, y: sy, tx0, ty0 } = pinchStart.current;
+        const ratio = distNow / (dist0 || 1);
+        const kNew = clamp(k0 * ratio, MIN_SCALE, MAX_SCALE);
+        // 基于捏合起点（k0 / tx0 / ty0）计算「起点中点对应的地图坐标」，
+        // 再按新 kNew 把当前中点放回该地图点 → 视觉平滑不跳。
+        const mapX = (sx - tx0) / k0;
+        const mapY = (sy - ty0) / k0;
+        const newOffsetX = midX - mapX * kNew;
+        const newOffsetY = midY - mapY * kNew;
+        setTransform(clampView({ k: kNew, x: newOffsetX, y: newOffsetY }));
+        return;
+      }
+
+      // 单指拖拽
       const d = dragRef.current;
       if (!d) return;
-      setAnimating(false); // 拖拽时打断飞行动画
+      setAnimating(false);
       const next: ViewTransform = {
         k: transform.k,
         x: d.tx + (e.clientX - d.x),
@@ -697,12 +774,34 @@ export default function MapCanvas(): JSX.Element {
       };
       setTransform(clampView(next));
     },
-    [clampView, transform.k],
+    [clampView, transform.k, transform.x, transform.y],
   );
 
-  const onPointerUp = useCallback((): void => {
-    dragRef.current = null;
-  }, []);
+  const onPointerUp = useCallback(
+    (e: React.PointerEvent<SVGSVGElement>): void => {
+      activePointerIds.current = activePointerIds.current.filter((pid) => pid !== e.pointerId);
+      const remaining = activePointerIds.current.length;
+      pointerPositions.current.delete(e.pointerId);
+      if (remaining === 0) {
+        dragRef.current = null;
+        pinchStart.current = null;
+      } else if (remaining === 1) {
+        // 双指→单指：把剩下的指作为新的拖拽起点，避免跳变
+        const pid = activePointerIds.current[0];
+        const p = pointerPositions.current.get(pid);
+        if (p) {
+          dragRef.current = {
+            x: p.x,
+            y: p.y,
+            tx: transform.x,
+            ty: transform.y,
+          };
+        }
+        pinchStart.current = null;
+      }
+    },
+    [transform.x, transform.y],
+  );
 
   const zoomBy = useCallback(
     (factor: number): void => {
@@ -1020,9 +1119,11 @@ export default function MapCanvas(): JSX.Element {
         width={size.w}
         height={size.h}
         className="map-surface absolute inset-0"
+        style={{ touchAction: 'none' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
         onDoubleClick={resetView}
       >

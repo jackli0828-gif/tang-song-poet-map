@@ -4,21 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 宣纸 / 绢帛
-        paper: '#F5EFE1',
-        'paper-2': '#EFE7D6',
-        'paper-3': '#E6DCC7',
+        // 宣纸 / 绢帛（迭代 17 · 深色模式：全部映射 CSS 变量，.dark 下翻转）
+        paper: 'var(--paper)',
+        'paper-2': 'var(--paper-2)',
+        'paper-3': 'var(--paper-3)',
         // 墨色层次
-        ink: '#2B2724',
-        'ink-2': '#4A443C',
-        'ink-3': '#6E665B',
-        'ink-4': '#9A9186',
-        // 朱砂 / 石青 / 石绿
-        cinnabar: '#A83232',
-        'cinnabar-2': '#C25B4A',
-        azurite: '#3A6EA5',
-        malachite: '#4F7C5A',
-        gold: '#B28A3C',
+        ink: 'var(--ink)',
+        'ink-2': 'var(--ink-2)',
+        'ink-3': 'var(--ink-3)',
+        'ink-4': 'var(--ink-4)',
+        // 朱砂 / 石青 / 石绿（深色下保持同色，仅调低不透明度）
+        cinnabar: 'var(--cinnabar)',
+        'cinnabar-2': 'var(--cinnabar-2)',
+        azurite: 'var(--azurite)',
+        malachite: 'var(--malachite)',
+        gold: 'var(--gold)',
       },
       fontFamily: {
         song: ['"Songti SC"', '"STSong"', '"SimSun"', '"Noto Serif SC"', '"Source Han Serif SC"', 'serif'],

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp, useAppDispatch, useAppState } from '../store/PoetContext';
 import GlobalSearch from './GlobalSearch';
+import { useTheme } from '../hooks/useTheme';
 
 /**
  * 迭代 9 · 轮次 3：复制分享链接。
@@ -90,6 +91,8 @@ export default function TopBar({ onOpenHelp }: { onOpenHelp: () => void }): JSX.
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { compareMode } = useApp();
+  // 迭代 17 · 深色模式切换（跟随系统 / 手动）
+  const { theme, toggle } = useTheme();
 
   const filters: { key: DynastyFilter; label: string }[] = [
     { key: 'all', label: '全部' },
@@ -147,8 +150,18 @@ export default function TopBar({ onOpenHelp }: { onOpenHelp: () => void }): JSX.
           同时保留原有的「名录过滤」行为（state.search 仍驱动 PoetSidebar 过滤）。 */}
       <GlobalSearch />
 
-      {/* 迭代 9：操作速查 + 分享链接；迭代 12：古韵背景音乐开关 */}
+      {/* 迭代 9：操作速查 + 分享链接；迭代 12：古韵背景音乐开关；
+          迭代 17：深色模式切换（跟随系统偏好，手动切换后持久化） */}
       <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={toggle}
+          title={theme === 'dark' ? '切换为宣纸浅色' : '切换为墨色深色'}
+          aria-label={theme === 'dark' ? '切换为宣纸浅色' : '切换为墨色深色'}
+          className="flex h-8 w-8 items-center justify-center rounded-sm border border-ink-4/45 bg-paper/70 text-[13px] text-ink-2 transition hover:bg-paper-3"
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
         <button
           type="button"
           onClick={() => dispatch({ type: 'TOGGLE_BGM' })}
