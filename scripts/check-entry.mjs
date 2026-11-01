@@ -27,10 +27,15 @@ try {
   process.exit(1);
 }
 
+// 先剥掉 HTML 注释再检查：index.html 里的警示注释本身包含
+// <script type="module" src="/src/main.tsx"> 这段示例文本，
+// 若不剥离，真入口被删掉时注释会让检查假通过。
+const scanned = html.replace(/<!--[\s\S]*?-->/g, '');
+
 const errors = [];
 
 // 1) 必须存在指向源码的入口
-if (!/<script[^>]+type=["']module["'][^>]+src=["']\/src\/main\.tsx["']/.test(html)) {
+if (!/<script[^>]+type=["']module["'][^>]+src=["']\/src\/main\.tsx["']/.test(scanned)) {
   errors.push(
     'index.html 中找不到 <script type="module" src="/src/main.tsx"> 入口。\n' +
       '    构建入口必须指向源码；若指向 ./assets/index-*.js，src 改动不会进入产物。',
@@ -38,7 +43,9 @@ if (!/<script[^>]+type=["']module["'][^>]+src=["']\/src\/main\.tsx["']/.test(htm
 }
 
 // 2) 入口不得指向构建产物
-const assetEntry = html.match(/<script[^>]+type=["']module["'][^>]+src=["'](\.?\/?assets\/[^"']+)["']/);
+const assetEntry = scanned.match(
+  /<script[^>]+type=["']module["'][^>]+src=["'](\.?\/?assets\/[^"']+)["']/,
+);
 if (assetEntry) {
   errors.push(
     `index.html 的模块入口指向了构建产物：${assetEntry[1]}\n` +
@@ -47,10 +54,10 @@ if (assetEntry) {
 }
 
 // 3) 不应残留指向旧产物的 modulepreload / stylesheet
-if (/<link[^>]+rel=["']modulepreload["'][^>]+href=["'][^"']*assets\/[^"']*["']/.test(html)) {
+if (/<link[^>]+rel=["']modulepreload["'][^>]+href=["'][^"']*assets\/[^"']*["']/.test(scanned)) {
   errors.push('index.html 残留了指向 assets/ 的 <link rel="modulepreload">，应由 vite 构建时自动注入。');
 }
-if (/<link[^>]+rel=["']stylesheet["'][^>]+href=["'][^"']*assets\/[^"']*["']/.test(html)) {
+if (/<link[^>]+rel=["']stylesheet["'][^>]+href=["'][^"']*assets\/[^"']*["']/.test(scanned)) {
   errors.push('index.html 残留了指向 assets/ 的 <link rel="stylesheet">，应由 vite 构建时自动注入。');
 }
 
