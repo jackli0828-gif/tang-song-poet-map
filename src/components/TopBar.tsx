@@ -50,7 +50,7 @@ function ShareButton(): JSX.Element {
     </button>
   );
 }
-import { DATA_STATS } from '../data/poets';
+import { useStats } from '../hooks/usePoetData';
 import type { DynastyFilter } from '../store/PoetContext';
 import type { EraKey, PanelView } from '../types';
 
@@ -91,6 +91,8 @@ export default function TopBar({ onOpenHelp }: { onOpenHelp: () => void }): JSX.
   const state = useAppState();
   const dispatch = useAppDispatch();
   const { compareMode } = useApp();
+  // 统计来自两级数据门面：首屏取名录索引的数字，补录语料并入后自动刷新
+  const stats = useStats();
   // 迭代 17 · 深色模式切换（跟随系统 / 手动）
   const { theme, toggle } = useTheme();
 
@@ -189,10 +191,10 @@ export default function TopBar({ onOpenHelp }: { onOpenHelp: () => void }): JSX.
 
       <div className="ml-auto flex items-center gap-3 text-[11px] text-ink-3">
         <span>
-          收录 {DATA_STATS.poets} 家（唐 {DATA_STATS.tang} · 宋 {DATA_STATS.song}）
+          收录 {stats.poets} 家（唐 {stats.tang} · 宋 {stats.song}）
         </span>
-        <span>节点 {DATA_STATS.nodes}</span>
-        <span>作品 {DATA_STATS.works}</span>
+        <span>节点 {stats.nodes}</span>
+        <span>作品 {stats.works}</span>
         {compareMode ? <span className="rounded-sm bg-cinnabar/10 px-2 py-0.5 text-cinnabar">对比模式</span> : null}
       </div>
     </header>

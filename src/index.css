@@ -194,6 +194,46 @@ input[type='range'].ink-range::-moz-range-thumb {
   }
 }
 
+/* 迭代 19 · 首屏载入条：单个分块的下载进度拿不到，用不定长扫光表示「在动」。
+   底条本身常亮（淡朱砂），扫光只是在上面移动的高光 ——
+   这样无论截到哪一帧，进度条都看得见，不会出现「整条移出视野」的空窗。 */
+.boot-bar {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(168, 50, 50, 0.28);
+}
+.boot-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    rgba(168, 50, 50, 0) 0%,
+    rgba(168, 50, 50, 0.95) 50%,
+    rgba(168, 50, 50, 0) 100%
+  );
+  background-size: 45% 100%;
+  background-repeat: no-repeat;
+  animation: bootSweep 1.25s linear infinite;
+}
+@keyframes bootSweep {
+  0% {
+    background-position: -45% 0;
+  }
+  100% {
+    background-position: 145% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-bar::after {
+    animation: none;
+    background-image: none;
+  }
+  .boot-bar {
+    background-color: rgba(168, 50, 50, 0.5);
+  }
+}
+
 /* 地图禁止选中文字，提升拖动手感 */
 .map-surface {
   user-select: none;

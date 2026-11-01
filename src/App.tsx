@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useAppState, useAppDispatch, useYearState, yearOf } from './store/PoetContext';
-import { loadSupplements } from './data/poets';
+import { loadSupplements } from './data/poetStore';
 import { activeNodeIndex } from './utils/geo';
+import BootGate from './components/BootGate';
 import TopBar from './components/TopBar';
 import GuideOverlay, { hasOnboarded, type GuideMode } from './components/GuideOverlay';
 import PoetSidebar from './components/PoetSidebar';
@@ -93,7 +94,12 @@ function useKeyboardShortcuts(onOpenHelp: () => void): void {
   }, [dispatch]);
 }
 
-export default function App(): JSX.Element {
+/**
+ * 迭代 19 · 应用外壳
+ * 只有在诗人详情（年谱 / 作品 / 全文）载入完成后才会挂载 —— 见下方 App 的 BootGate。
+ * 因此这里可以放心地把 primaryPoet 当作完整诗人对象使用。
+ */
+function AppShell(): JSX.Element {
   const state = useAppState();
   const dispatch = useAppDispatch();
 
@@ -316,5 +322,20 @@ export default function App(): JSX.Element {
       {/* 迭代 16：作品全文放大页（字号 / 页面大小可调，Esc 关闭） */}
       <WorkFullscreen />
     </div>
+  );
+}
+
+/**
+ * 迭代 19 · 两级数据加载的入口
+ * ------------------------------------------------------------------
+ * 诗人名录索引（12.6 KB gzip）随主包同步载入，首屏立刻能画出来；
+ * 年谱详情（≈298 KB gzip）是独立分块，由 BootGate 异步取回。
+ * 这样主包从 359 KB gzip 降到几十 KB，业务代码改动不再连带 300 KB 数据重下。
+ */
+export default function App(): JSX.Element {
+  return (
+    <BootGate>
+      <AppShell />
+    </BootGate>
   );
 }

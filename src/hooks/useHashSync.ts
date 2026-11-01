@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { POET_MAP } from '../data/poets';
+import { getPoetMap } from '../data/poetStore';
 import { useAppDispatch, useAppState, useYearState } from '../store/PoetContext';
 
 /**
@@ -22,7 +22,7 @@ export function useHashSync(): void {
     const m = /^#([A-Za-z]+)(?:\/(\d{3,4}))?$/.exec(hash);
     if (!m) return false;
     const [, id, yearStr] = m;
-    if (!POET_MAP[id]) return false;
+    if (!getPoetMap()[id]) return false;
     dispatch({ type: 'SELECT_POET', id });
     if (yearStr) dispatch({ type: 'SET_YEAR', poetId: id, year: Number(yearStr) });
     return true;

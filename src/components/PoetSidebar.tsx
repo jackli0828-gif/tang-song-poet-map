@@ -1,12 +1,6 @@
 import React from 'react';
 import { useApp, useAppDispatch, useAppState, useFilteredPoets } from '../store/PoetContext';
-import { DATA_STATS } from '../data/poets';
-import { activeNodeIndex } from '../utils/geo';
-
-/** 统计某位诗人的作品总数（遍历其全部节点） */
-function nodeCount(p: { nodes: { works: unknown[] }[] }): number {
-  return p.nodes.reduce((sum, n) => sum + n.works.length, 0);
-}
+import { useStats } from '../hooks/usePoetData';
 
 /** 左侧诗人名录：朝代筛选、搜索、单选 / 多选对比 */
 export default function PoetSidebar(): JSX.Element {
@@ -14,6 +8,7 @@ export default function PoetSidebar(): JSX.Element {
   const dispatch = useAppDispatch();
   const { primaryPoet, selectedPoets } = useApp();
   const list = useFilteredPoets();
+  const stats = useStats();
 
   return (
     <aside className="flex h-full w-full flex-col border-r border-ink-4/40 bg-paper-2 transition-all">
@@ -21,7 +16,7 @@ export default function PoetSidebar(): JSX.Element {
         <span>
           诗人词人
           <span className="ml-1.5 text-[11.5px] text-ink-4">
-            {list.length} / {DATA_STATS.poets} 家
+            {list.length} / {stats.poets} 家
           </span>
         </span>
         <button

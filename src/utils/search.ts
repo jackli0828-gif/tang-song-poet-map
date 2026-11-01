@@ -6,7 +6,7 @@
  * - 三组结果（诗人 / 作品 / 地点）分组返回，便于 UI 分栏展示；
  * - 排序分档：标题/姓名命中 > 正文命中，年份倒序仅作同档内次级排序。
  */
-import { POETS } from '../data/poets';
+import { getPoets, isPoetsLoaded } from '../data/poetStore';
 import type { EventType, LifeNode, Poet, Work } from '../types';
 
 export interface PoetHit {
@@ -61,8 +61,10 @@ let placeIndexCache: PlaceAgg[] | null = null;
 /** 全量地点索引：把所有诗人的足迹聚合成「某地—哪些诗人到过—留下多少作品」 */
 function buildPlaceIndex(): PlaceAgg[] {
   if (placeIndexCache) return placeIndexCache;
+  // 详情未载入时不要建（更不能缓存）：否则会把「空索引」记成结果，之后永远查不到
+  if (!isPoetsLoaded()) return [];
   const map = new Map<string, PlaceAgg>();
-  for (const poet of POETS) {
+  for (const poet of getPoets()) {
     for (const node of poet.nodes) {
       const key = `${node.place}|${node.modernPlace}`;
       let agg = map.get(key);
@@ -122,7 +124,7 @@ export function searchAll(keyword: string): SearchResult {
   const works: WorkHit[] = [];
   const places: PlaceHit[] = [];
 
-  for (const poet of POETS) {
+  for (const poet of getPoets()) {
     const pScore = scoreOf(
       [
         { text: poet.name, weight: W_NAME },
@@ -172,7 +174,7 @@ export function searchAll(keyword: string): SearchResult {
       modernPlace: agg.modernPlace,
       lng: agg.lng,
       lat: agg.lat,
-      poets: POETS.filter((p) => agg.poetIds.has(p.id)),
+      poets: getPoets().filter((p) => agg.poetIds.has(p.id)),
       workCount: agg.workCount,
       // 到过的诗人越多、作品越多，越可能是用户想找的地点
       score: s + Math.min(agg.poetIds.size, 6) * 3 + Math.min(agg.workCount, 10),
@@ -253,8 +255,10 @@ function clusterKeyOf(lng: number, lat: number): string {
 /** 把所有诗人的节点按坐标聚合成「地点—访客」索引（模块级缓存，只建一次） */
 function buildClusterIndex(): Map<string, Cluster> {
   if (clusterCache) return clusterCache;
+  // 同 buildPlaceIndex：未载入时返回空表且不缓存
+  if (!isPoetsLoaded()) return new Map<string, Cluster>();
   const map = new Map<string, Cluster>();
-  for (const poet of POETS) {
+  for (const poet of getPoets()) {
     for (const node of poet.nodes) {
       const key = clusterKeyOf(node.lng, node.lat);
       let c = map.get(key);
@@ -381,7 +385,7 @@ export function allPlaces(): PlaceHit[] {
       modernPlace: agg.modernPlace,
       lng: agg.lng,
       lat: agg.lat,
-      poets: POETS.filter((p) => agg.poetIds.has(p.id)),
+      poets: getPoets().filter((p) => agg.poetIds.has(p.id)),
       workCount: agg.workCount,
       score: agg.poetIds.size * 10 + agg.workCount,
     }))

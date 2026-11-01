@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useApp, useAppDispatch, useAppState, useYearState, yearOf } from '../store/PoetContext';
-import { POETS } from '../data/poets';
+import { POETS_META } from '../data/poetStore';
 import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { activeNodeIndex } from '../utils/geo';
@@ -88,7 +88,7 @@ export default function CompareView(): JSX.Element {
         </p>
 
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {POETS.map((p) => {
+          {POETS_META.map((p) => {
             const on = state.selectedIds.includes(p.id);
             return (
               <button

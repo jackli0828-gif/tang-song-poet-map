@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppState, useAppDispatch } from '../store/PoetContext';
-import { POET_MAP } from '../data/poets';
+import { getPoetMap } from '../data/poetStore';
 import { type Poet, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { useSpeechState } from '../hooks/useSpeech';
@@ -30,8 +30,9 @@ export default function WorkFullscreen(): JSX.Element | null {
   const ctx = useMemo<{ poet: Poet; work: Work; nodeIndex: number } | null>(() => {
     if (!openWorkId) return null;
     const ordered = [state.primaryId, ...state.selectedIds.filter((id) => id !== state.primaryId)];
+    const poetMap = getPoetMap();
     for (const pid of ordered) {
-      const poet = POET_MAP[pid];
+      const poet = poetMap[pid];
       if (!poet) continue;
       for (let i = 0; i < poet.nodes.length; i++) {
         const w = poet.nodes[i].works.find((x) => x.id === openWorkId);

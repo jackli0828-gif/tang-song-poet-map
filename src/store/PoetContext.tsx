@@ -7,7 +7,8 @@ import React, {
   type Dispatch,
   type ReactNode,
 } from 'react';
-import { POETS, POET_MAP } from '../data/poets';
+import { POETS_META, POET_META_MAP, getPoetMap, getPoets, type PoetMeta } from '../data/poetStore';
+import { usePoetsVersion } from '../hooks/usePoetData';
 import type { EraKey, PanelView, PlaySpeed, Poet } from '../types';
 import { activeNodeIndex } from '../utils/geo';
 
@@ -117,15 +118,19 @@ export type AppAction =
 
 const MAX_COMPARE = 3;
 
+/**
+ * 年份初值：只依赖名录索引（生年），**不需要**载入详情。
+ * 这样首屏状态初始化不必等 3.4 MB 的诗人详情。
+ */
 const initialYearMap = (): Record<string, number> => {
   const map: Record<string, number> = {};
-  for (const p of POETS) map[p.id] = p.birthYear;
+  for (const m of POETS_META) map[m.id] = m.birthYear;
   return map;
 };
 
 export const initialState: AppState = {
-  selectedIds: [POETS[0].id],
-  primaryId: POETS[0].id,
+  selectedIds: [POETS_META[0].id],
+  primaryId: POETS_META[0].id,
   dynastyFilter: 'all',
   search: '',
   yearByPoet: initialYearMap(),
@@ -157,25 +162,27 @@ export const initialState: AppState = {
 
 /** 依据诗人 id 取当前年份（回退到出生年）。接收年份切片即可，无需完整 state */
 export function yearOf(state: { yearByPoet: Record<string, number> }, poetId: string): number {
-  const poet = POET_MAP[poetId];
-  if (!poet) return 0;
+  // 生卒年来自名录索引，详情未载入也能算 —— 时间轴、URL 深链因此可以先动起来
+  const meta = POET_META_MAP[poetId];
+  if (!meta) return 0;
   const y = state.yearByPoet[poetId];
-  if (typeof y !== 'number') return poet.birthYear;
-  return Math.min(poet.deathYear, Math.max(poet.birthYear, y));
+  if (typeof y !== 'number') return meta.birthYear;
+  return Math.min(meta.deathYear, Math.max(meta.birthYear, y));
 }
 
 function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SELECT_POET': {
-      const poet = POET_MAP[action.id];
-      if (!poet) return state;
+      // 只需要生年 → 查名录索引，不依赖详情是否已载入
+      const meta = POET_META_MAP[action.id];
+      if (!meta) return state;
       // 切换诗人：停止播放，并把年份归零到该诗人的出生年，
       // 否则播放中的浮点年份会被带到新诗人身上，跳过其青少年阶段。
       return {
         ...state,
         primaryId: action.id,
         selectedIds: [action.id],
-        yearByPoet: { ...state.yearByPoet, [action.id]: poet.birthYear },
+        yearByPoet: { ...state.yearByPoet, [action.id]: meta.birthYear },
         lockedNodeByPoet: { ...state.lockedNodeByPoet, [action.id]: null },
         playing: false,
       };
@@ -217,7 +224,7 @@ function reducer(state: AppState, action: AppAction): AppState {
     }
     case 'SET_NODE': {
       // 迭代 15 · 作品默认展开全文：定位到某节点时，把该节点的所有作品默认展开
-      const node = POET_MAP[action.poetId]?.nodes.find((n) => n.id === action.nodeId);
+      const node = getPoetMap()[action.poetId]?.nodes.find((n) => n.id === action.nodeId);
       const workIds: string[] = node && node.works.length > 0 ? node.works.map((w) => w.id) : [];
       if (state.syncYears) {
         const nextYears: Record<string, number> = { ...state.yearByPoet };
@@ -244,16 +251,16 @@ function reducer(state: AppState, action: AppAction): AppState {
       };
     }
     case 'RESET_YEAR': {
-      const poet = POET_MAP[action.poetId];
-      if (!poet) return state;
+      const meta = POET_META_MAP[action.poetId];
+      if (!meta) return state;
       if (state.syncYears) {
         const nextYears: Record<string, number> = { ...state.yearByPoet };
-        for (const id of state.selectedIds) nextYears[id] = poet.birthYear;
+        for (const id of state.selectedIds) nextYears[id] = meta.birthYear;
         return { ...state, yearByPoet: nextYears, lockedNodeByPoet: {}, playing: false };
       }
       return {
         ...state,
-        yearByPoet: { ...state.yearByPoet, [action.poetId]: poet.birthYear },
+        yearByPoet: { ...state.yearByPoet, [action.poetId]: meta.birthYear },
         lockedNodeByPoet: { ...state.lockedNodeByPoet, [action.poetId]: null },
         playing: false,
       };
@@ -266,7 +273,7 @@ function reducer(state: AppState, action: AppAction): AppState {
       // 让地图作品浮层在播放终点（或暂停点）稳定呈现，不会闪掉。
       if (!state.playing) {
         // 将要进入播放态：锁上出生年节点（轨迹起点），浮层在起点稳定呈现
-        const poet = POET_MAP[state.primaryId];
+        const poet = getPoetMap()[state.primaryId];
         if (poet) {
           const birthNode = poet.nodes.find((n) => n.eventType === 'birth') ?? poet.nodes[0];
           if (birthNode) {
@@ -277,7 +284,7 @@ function reducer(state: AppState, action: AppAction): AppState {
         return { ...state, playing: true };
       }
       // 将要暂停：锁上当前年份对应的活动节点（可能是轨迹终点），浮层稳定呈现
-      const poet = POET_MAP[state.primaryId];
+      const poet = getPoetMap()[state.primaryId];
       if (poet) {
         const curYear = state.yearByPoet[state.primaryId] ?? poet.birthYear;
         const idx = activeNodeIndex(poet.nodes, curYear);
@@ -297,7 +304,7 @@ function reducer(state: AppState, action: AppAction): AppState {
       // 这里把「当前年份对应的活动节点」锁上，让浮层在轨迹终点稳定呈现，
       // 同时避免浮层随镜头飞行反复重定位。
       if (action.playing === false) {
-        const poet = POET_MAP[state.primaryId];
+        const poet = getPoetMap()[state.primaryId];
         if (poet) {
           const curYear = state.yearByPoet[state.primaryId] ?? poet.deathYear;
           const idx = activeNodeIndex(poet.nodes, curYear);
@@ -508,15 +515,24 @@ export interface AppDerived {
 export function useApp(): AppDerived & { state: RestState; dispatch: Dispatch<AppAction> } {
   const state = useAppState();
   const dispatch = useAppDispatch();
+  // 订阅详情版本：详情载入完成 / 补录并入后，本 hook 的消费方需要重新取一次
+  const version = usePoetsVersion();
+  const poets = getPoets();
+  const poetMap = getPoetMap();
   const selectedPoets = useMemo(
-    () => state.selectedIds.map((id) => POET_MAP[id]).filter((p): p is Poet => Boolean(p)),
-    [state.selectedIds],
+    () => state.selectedIds.map((id) => poetMap[id]).filter((p): p is Poet => Boolean(p)),
+    // version 进依赖：补录是原地改写，只有版本号能反映「内容变了」
+    [state.selectedIds, version],
   );
-  const primaryPoet = POET_MAP[state.primaryId] ?? POETS[0];
+  const primaryPoet = poetMap[state.primaryId] ?? poets[0];
+  if (!primaryPoet) {
+    // 详情未载入时不该走到这里 —— 依赖年谱的组件必须挂在 BootGate 之后（见 App.tsx）
+    throw new Error('诗人详情尚未载入：useApp() 只能在 BootGate 之后使用。');
+  }
   return {
     state,
     dispatch,
-    poets: POETS,
+    poets,
     primaryPoet,
     selectedPoets,
     compareMode: selectedPoets.length > 1,
@@ -527,21 +543,29 @@ export function useApp(): AppDerived & { state: RestState; dispatch: Dispatch<Ap
  * 过滤后的诗人列表（朝代 + 搜索）。
  * 迭代 10：收录扩至两部三百首的 161 家后名录变长，改为
  * 「唐在前、宋在后，各自按生年升序」，让名录自己就是一条时间线。
+ *
+ * 迭代 19：返回**名录索引**而非完整诗人对象 —— 名录只需要姓名 / 朝代 / 生年，
+ * 首屏不必等 3.4 MB 详情。小传关键词检索在详情载入后自动升级（见下方注释）。
  */
-export function useFilteredPoets(): Poet[] {
-  const { poets } = useApp();
+export function useFilteredPoets(): PoetMeta[] {
   const state = useAppState();
+  const version = usePoetsVersion();
   return useMemo(() => {
     const kw = state.search.trim();
-    const filtered = poets.filter((p) => {
-      if (state.dynastyFilter !== 'all' && p.dynasty !== state.dynastyFilter) return false;
+    const poetMap = getPoetMap();
+    const filtered = POETS_META.filter((m) => {
+      if (state.dynastyFilter !== 'all' && m.dynasty !== state.dynastyFilter) return false;
       if (!kw) return true;
-      const hay = `${p.name}${p.courtesy ?? ''}${p.pseudonym ?? ''}${p.birthplace}${p.brief}`;
-      return hay.includes(kw);
+      const hay = `${m.name}${m.courtesy ?? ''}${m.pseudonym ?? ''}${m.birthplace}`;
+      if (hay.includes(kw)) return true;
+      // 小传不在名录索引里（474 条约 130 KB，会把索引撑大一倍）。
+      // 详情已载入时补一次小传匹配，功能与拆分前一致；未载入则只按前四个字段匹配。
+      const full = poetMap[m.id];
+      return full ? full.brief.includes(kw) : false;
     });
     return filtered.sort((a, b) => {
       if (a.dynasty !== b.dynasty) return a.dynasty === '唐' ? -1 : 1;
       return a.birthYear - b.birthYear;
     });
-  }, [poets, state.dynastyFilter, state.search]);
+  }, [version, state.dynastyFilter, state.search]);
 }
