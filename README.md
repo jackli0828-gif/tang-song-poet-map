@@ -8,17 +8,25 @@
 注意：GitHub Pages 免费账户**不支持私有仓库**，本仓库须保持 public 才能部署。
 
 一个**完全离线**的唐宋诗人词人时空轨迹可视化网站：内置中国矢量地图（不调用任何在线地图瓦片 / 地图 SDK），
-以 d3-geo 投影自行渲染 SVG 底图，把 14 位唐宋大家的年谱节点连成轨迹，
-沿时间轴播放时逐节点推进，并在右侧同步呈现「此地此际所作」的作品。
+以 d3-geo 投影自行渲染 SVG 底图，把 474 位唐宋诗人词人的 1827 个年谱节点连成轨迹，
+沿时间轴播放时逐节点推进，并在右侧同步呈现「此地此际所作」的 2066 篇作品。
 
 ## 快速开始
 
 ```bash
 npm install                 # 若索引异常：npm install --registry=https://registry.npmmirror.com
 npm run dev                 # 开发服务器
-npm run build               # tsc --noEmit + vite build
+npm run build               # 入口检查 → tsc --noEmit → vite build
 npm run typecheck           # 仅类型检查
+npm run check:data          # 数据体检（id 唯一 / 生卒自洽 / 坐标 / 引用 / 名句与全文一致）
+npm run check:entry         # 构建入口守卫
+npm run verify              # 以上全部跑一遍（提交前建议执行）
 ```
+
+> **⚠️ 构建入口约定**：`index.html` 里的 `<script type="module">` 必须指向 `/src/main.tsx`，
+> **不能**指向 `./assets/index-*.js`。一旦指向产物，vite 会把旧 bundle 当入口重新打包，
+> `src/` 下的改动全部不进入产物，而且构建不报错、部署也显示成功（历史上曾因此丢失 319 位诗人）。
+> `npm run build` 会自动执行 `scripts/check-entry.mjs` 拦截这种情况，根目录也不再存放预构建产物。
 
 ## 功能
 

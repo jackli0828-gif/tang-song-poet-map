@@ -4,6 +4,9 @@ node_modules/
 # 构建产物（Pages 由 GitHub 构建，dist 不入库）
 dist/
 dist-single/
+# 根目录曾用于「仓库根可直接静态服务」的预构建产物。
+# 它会让 vite 把旧 bundle 当入口重新打包（src 改动静默失效），已废弃，勿再提交。
+/assets/
 
 # 单文件离线包（桌面交付物，体积大，不入库）
 唐宋词人时空轨迹图.html
@@ -12,6 +15,7 @@ dist-single/
 .DS_Store
 *.log
 *.tmp.mjs
+.data-check.cjs
 .mback/
 .verify/
 src/data.bak/

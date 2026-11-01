@@ -4,16 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="唐宋诗人词人时空轨迹地图：人 — 时间 — 地点 — 作品 一一对应" />
+    <meta name="theme-color" content="#F5EFE1" />
+    <!-- 社交分享卡片（绝对地址；将来换自定义域名时一并改掉） -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="唐宋词人时空轨迹图" />
+    <meta property="og:title" content="唐宋词人轨迹 · 时空诗旅图" />
+    <meta
+      property="og:description"
+      content="474 位唐宋诗人词人的年谱轨迹：人 — 时间 — 地点 — 作品，一一对应。完全离线，不依赖任何在线地图服务。"
+    />
+    <meta property="og:url" content="https://jackli0828-gif.github.io/tang-song-poet-map/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="唐宋词人轨迹 · 时空诗旅图" />
+    <meta
+      name="twitter:description"
+      content="474 位唐宋诗人词人的年谱轨迹：人 — 时间 — 地点 — 作品，一一对应。"
+    />
     <!-- 中式印章造型 favicon（inline SVG data URI，不引入二进制文件） -->
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23F5EFE1'/%3E%3Crect x='3.5' y='3.5' width='25' height='25' rx='3' fill='none' stroke='%23A83232' stroke-width='3'/%3E%3Ctext x='16' y='21' font-family='Songti SC,STSong,SimSun,serif' font-size='16' font-weight='700' text-anchor='middle' fill='%23A83232'%3E%E8%AF%97%3C/text%3E%3C/svg%3E"
     />
     <title>唐宋词人轨迹 · 时空诗旅图</title>
-    <script type="module" crossorigin src="./assets/index-D0OEFMFZ.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/react-nf7bT_Uh.js">
-    <link rel="modulepreload" crossorigin href="./assets/d3-pw5ah3n9.js">
-    <link rel="stylesheet" crossorigin href="./assets/index-CYx5ZH-T.css">
+    <!--
+      ⚠️ 入口必须是 /src/main.tsx，绝不能写成已构建产物的路径（如 ./assets/index-xxx.js）。
+      写成产物路径时，vite 会把那个旧 bundle 当入口再打包一次，src 下的改动全部不进入产物，
+      而且构建不报错、部署也"成功" —— 迭代 12/13 补录的 319 位诗人就是这样静默丢失的。
+      scripts/check-entry.mjs 会在 npm run build 之前拦截这个错误。
+    -->
+    <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>
     <div id="root"></div>
