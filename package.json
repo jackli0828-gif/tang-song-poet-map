@@ -11,8 +11,10 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check:entry": "node scripts/check-entry.mjs",
+    "gen:geo": "node scripts/gen-geo.mjs",
+    "check:geo": "node scripts/gen-geo.mjs --check",
     "check:data": "esbuild scripts/data-check.ts --bundle --platform=node --outfile=.data-check.cjs --log-level=error && node .data-check.cjs",
-    "verify": "npm run check:entry && npm run typecheck && npm run check:data && vite build"
+    "verify": "npm run check:entry && npm run check:geo && npm run typecheck && npm run check:data && vite build"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",

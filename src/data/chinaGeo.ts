@@ -20,8 +20,15 @@
  * 性能说明（迭代 1）：
  * 全部导出均为模块级常量 —— 归一化只在模块首次加载时执行一次，
  * 任何组件/多组件引用共享同一份结果，避免重复归一化。
+ *
+ * 性能说明（迭代 19）：
+ * 不再直接 import 202 KB 的 china-geo.json，改由 scripts/gen-geo.mjs 打成
+ * 78 KB 的紧凑格式（坐标 ×1000 取整 + 环内增量 + base36，无损），运行时用
+ * geoCodec.unpackGeo 还原。gzip 58.3 → 37.3 KB，且这份数据在首屏关键路径上。
+ * ⚠️ 改动 china-geo.json 后必须运行 `npm run gen:geo`，否则 check:geo 会失败。
  */
-import raw from './china-geo.json';
+import packed from './china-geo.packed.json';
+import { unpackGeo, type PackedGeo } from './geoCodec';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 
 /** 省级要素属性 */
@@ -94,8 +101,10 @@ export function normalizeWinding(collection: ChinaFeatureCollection): ChinaFeatu
   };
 }
 
-/** 内置全国省级边界（含南海诸岛断续线）——模块级缓存，仅在模块加载时归一化一次 */
-export const chinaGeo: ChinaFeatureCollection = normalizeWinding(raw as unknown as ChinaFeatureCollection);
+/** 内置全国省级边界（含南海诸岛断续线）——模块级缓存，仅在模块加载时解包 + 归一化一次 */
+export const chinaGeo: ChinaFeatureCollection = normalizeWinding(
+  unpackGeo(packed as unknown as PackedGeo),
+);
 
 /** 省级面（不含断续线），用于填充与着色（模块级缓存，多组件共享） */
 export const provinceFeatures: ChinaFeature[] = chinaGeo.features.filter((f) => !f.properties.isDashLine);
