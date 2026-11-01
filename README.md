@@ -2,6 +2,11 @@
 
 > 人 — 时间 — 地点 — 作品，一一对应。
 
+**在线地址：<https://jackli0828-gif.github.io/tang-song-poet-map/>**
+
+推送 `main` 即由 GitHub Actions 自动构建并发布（`.github/workflows/deploy.yml`）。
+注意：GitHub Pages 免费账户**不支持私有仓库**，本仓库须保持 public 才能部署。
+
 一个**完全离线**的唐宋诗人词人时空轨迹可视化网站：内置中国矢量地图（不调用任何在线地图瓦片 / 地图 SDK），
 以 d3-geo 投影自行渲染 SVG 底图，把 14 位唐宋大家的年谱节点连成轨迹，
 沿时间轴播放时逐节点推进，并在右侧同步呈现「此地此际所作」的作品。
