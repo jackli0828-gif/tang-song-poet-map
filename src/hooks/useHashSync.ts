@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { POET_MAP } from '../data/poets';
-import { useAppDispatch, useAppState } from '../store/PoetContext';
+import { useAppDispatch, useAppState, useYearState } from '../store/PoetContext';
 
 /**
  * 迭代 3 · URL 深链：#<诗人id>/<年份>
@@ -12,6 +12,7 @@ import { useAppDispatch, useAppState } from '../store/PoetContext';
  */
 export function useHashSync(): void {
   const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   // 初始化只做一次，避免与写回逻辑互相触发
   const inited = useRef(false);
@@ -47,12 +48,12 @@ export function useHashSync(): void {
   //    播放过程中年份是浮点，这里取整后再比较，避免每帧都写地址栏。
   useEffect(() => {
     if (!inited.current) return;
-    const raw = state.yearByPoet[state.primaryId];
+    const raw = yearState.yearByPoet[state.primaryId];
     if (typeof raw !== 'number') return;
     const year = Math.round(raw);
     const next = `#${state.primaryId}/${year}`;
     if (window.location.hash !== next) {
       window.history.replaceState(null, '', next);
     }
-  }, [state.primaryId, state.yearByPoet]);
+  }, [state.primaryId, yearState.yearByPoet]);
 }

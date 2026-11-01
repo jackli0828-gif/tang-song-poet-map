@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useYearState, yearOf } from '../store/PoetContext';
 import { POETS } from '../data/poets';
 import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet } from '../types';
 import { ageAt, formatEra } from '../utils/format';
@@ -15,6 +15,7 @@ import { activeNodeIndex } from '../utils/geo';
  */
 export default function CompareView(): JSX.Element {
   const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   const { selectedPoets, primaryPoet } = useApp();
 
@@ -28,7 +29,7 @@ export default function CompareView(): JSX.Element {
     return { min: Math.min(...starts), max: Math.max(...ends) };
   }, [selectedPoets]);
 
-  const year = yearOf(state, primaryPoet.id);
+  const year = yearOf(yearState, primaryPoet.id);
   // 播放过程中 year 是浮点（用于轨迹平滑插值），展示位一律取整
   const shownYear = Math.round(year);
   const span = range.max - range.min || 1;
@@ -55,7 +56,7 @@ export default function CompareView(): JSX.Element {
   const sameYearCards = useMemo(
     () =>
       selectedPoets.map((p) => {
-        const y = state.syncYears ? shownYear : Math.round(yearOf(state, p.id));
+        const y = state.syncYears ? shownYear : Math.round(yearOf(yearState, p.id));
         const node = nodeAt(p, y);
         const works = node?.works ?? [];
         return {
@@ -67,7 +68,7 @@ export default function CompareView(): JSX.Element {
         };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedPoets, state, shownYear],
+    [selectedPoets, state, shownYear, yearState],
   );
 
   /** C.3 点卡片跳该诗人该节点：SELECT_POET（切换主诗人+停播）+ SET_NODE（定位该节点） */
@@ -222,7 +223,7 @@ export default function CompareView(): JSX.Element {
               </div>
               {/* 各诗人泳道 */}
               {selectedPoets.map((p) => {
-                const y = state.syncYears ? shownYear : Math.round(yearOf(state, p.id));
+                const y = state.syncYears ? shownYear : Math.round(yearOf(yearState, p.id));
                 const from = pct(p.birthYear);
                 const to = pct(p.deathYear);
                 return (

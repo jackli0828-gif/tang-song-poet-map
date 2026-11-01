@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApp, useAppState, useAppDispatch, yearOf } from './store/PoetContext';
+import { useApp, useAppState, useAppDispatch, useYearState, yearOf } from './store/PoetContext';
 import { loadSupplements } from './data/poets';
 import { activeNodeIndex } from './utils/geo';
 import TopBar from './components/TopBar';
@@ -31,7 +31,7 @@ function RightPanel(): JSX.Element {
  * 输入框内不拦截，避免影响搜索。
  */
 function useKeyboardShortcuts(onOpenHelp: () => void): void {
-  const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   const { primaryPoet } = useApp();
 
@@ -42,8 +42,8 @@ function useKeyboardShortcuts(onOpenHelp: () => void): void {
   }, [onOpenHelp]);
 
   const idx = useMemo(
-    () => activeNodeIndex(primaryPoet.nodes, yearOf(state, primaryPoet.id)),
-    [primaryPoet, state],
+    () => activeNodeIndex(primaryPoet.nodes, yearOf(yearState, primaryPoet.id)),
+    [primaryPoet, yearState],
   );
 
   // 关键：用 ref 承载最新值，使监听器只注册一次。
@@ -101,12 +101,28 @@ export default function App(): JSX.Element {
   // 这批数据约占产物三分之一体积，独立成 chunk 后首屏不必等它解析完。
   // 并入完成后 dataVersion +1，使承载数据的子树重挂载一次，
   // 让新并入的作品与统计数字进入界面（比逐个刷新对象身份更稳、更简单）。
+  //
+  // 迭代 18 · 失败兜底：分块加载失败（网络抖动 / 广告拦截 / 发版后旧 chunk 404）
+  // 原先没有任何 catch —— 表现是 1202 篇作品静默消失、统计停在 864，用户和开发者
+  // 都看不到提示。现在自动重试一次，仍失败则显示可感知的横幅并提示刷新。
   const [dataVersion, setDataVersion] = useState(0);
+  const [supplementFailed, setSupplementFailed] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    loadSupplements().then(() => {
-      if (!cancelled) setDataVersion((v) => v + 1);
-    });
+    const attempt = async (): Promise<void> => {
+      for (let i = 0; i < 2; i += 1) {
+        try {
+          await loadSupplements();
+          if (!cancelled) setDataVersion((v) => v + 1);
+          return;
+        } catch (err) {
+          console.error(`[supplements] 辞典补录语料加载失败（第 ${i + 1}/2 次）`, err);
+          if (i === 0) await new Promise((r) => setTimeout(r, 1200));
+        }
+      }
+      if (!cancelled) setSupplementFailed(true);
+    };
+    void attempt();
     return () => {
       cancelled = true;
     };
@@ -164,6 +180,26 @@ export default function App(): JSX.Element {
 
   return (
     <div ref={rootRef} className="paper-bg flex h-full flex-col overflow-hidden text-ink">
+      {/* 迭代 18：补录语料加载失败横幅（自动重试一次仍失败才出现） */}
+      {supplementFailed ? (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center justify-center gap-3 border-b border-cinnabar/40 bg-cinnabar/10 px-4 py-1.5 text-[12px] text-ink-2"
+        >
+          <span>
+            辞典补录语料未能载入，<span className="text-cinnabar">1202 篇</span>
+            作品暂不可见（其余功能正常）。
+          </span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded border border-cinnabar/50 px-2 py-0.5 text-cinnabar transition hover:bg-cinnabar/10"
+          >
+            刷新重试
+          </button>
+        </div>
+      ) : null}
+
       {/* 迭代 12：全屏模式下隐藏顶栏，把整屏让给地图 */}
       {!state.mapFullscreen ? <TopBar key={`top-${dataVersion}`} onOpenHelp={() => setGuide('help')} /> : null}
 

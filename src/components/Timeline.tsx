@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useYearState, yearOf } from '../store/PoetContext';
 import { useTimelinePlayer } from '../hooks/useTimelinePlayer';
 import { useSpeechState } from '../hooks/useSpeech';
 import { EVENT_COLOR, type LifeNode, type PlaySpeed, type Poet } from '../types';
@@ -97,10 +97,11 @@ function PoetTrackRow({
 /** 底部时间轴与播放控制（迭代 1 · B.3：有作品年份朱砂标记 + 播放自动展开在 WorkPanel） */
 export default function Timeline(): JSX.Element {
   const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   const { primaryPoet, selectedPoets, compareMode } = useApp();
 
-  const year = yearOf(state, primaryPoet.id);
+  const year = yearOf(yearState, primaryPoet.id);
   // 播放过程中 year 是浮点（用于轨迹平滑插值），展示位一律取整
   const shownYear = Math.round(year);
   const idx = activeNodeIndex(primaryPoet.nodes, year);
@@ -374,7 +375,7 @@ export default function Timeline(): JSX.Element {
       {compareMode && others.length > 0 ? (
         <div className="mt-2 space-y-1 border-t border-ink-4/25 pt-2">
           {others.map((p) => (
-            <PoetTrackRow key={p.id} poet={p} year={yearOf(state, p.id)} active={false} onPickNode={onPickNode} />
+            <PoetTrackRow key={p.id} poet={p} year={yearOf(yearState, p.id)} active={false} onPickNode={onPickNode} />
           ))}
         </div>
       ) : null}

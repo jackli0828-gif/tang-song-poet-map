@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useYearState, yearOf } from '../store/PoetContext';
 import { useMapProjection, type MapProjection } from '../hooks/useMapProjection';
 import { dashLineFeatures, provinceFeatures } from '../data/chinaGeo';
 import { RIVERS } from '../data/rivers';
@@ -612,6 +612,7 @@ function TrackLayer({ poets, years, mp, k, onPickNode, onNodeHover, showLinks }:
  * ============================================================ */
 export default function MapCanvas(): JSX.Element {
   const state = useAppState();
+  const yearState = useYearState();
   const { selectedPoets, primaryPoet } = useApp();
   const dispatch = useAppDispatch();
 
@@ -880,13 +881,13 @@ export default function MapCanvas(): JSX.Element {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       const a = document.createElement('a');
-      const year = Math.round(yearOf(state, primaryPoet.id));
+      const year = Math.round(yearOf(yearState, primaryPoet.id));
       a.download = `${primaryPoet.name}_${year}年_行迹图.png`;
       a.href = canvas.toDataURL('image/png');
       a.click();
     };
     img.src = url;
-  }, [size.w, size.h, state, primaryPoet]);
+  }, [size.w, size.h, state, primaryPoet, yearState]);
 
   /**
    * 迭代 6：响应「聚焦请求」（点击时代都会列表时派发），
@@ -935,7 +936,7 @@ export default function MapCanvas(): JSX.Element {
   const popupDragRef = useRef<{ startX: number; startY: number; startLeft: number; startTop: number } | null>(null);
 
   const popup = useMemo(() => {
-    const lockedId = state.lockedNodeByPoet[primaryPoet.id];
+    const lockedId = yearState.lockedNodeByPoet[primaryPoet.id];
     if (!lockedId) return null;
     const i = primaryPoet.nodes.findIndex((n) => n.id === lockedId);
     const node = primaryPoet.nodes[i];
@@ -970,7 +971,7 @@ export default function MapCanvas(): JSX.Element {
       top,
       placement: (placeUp ? 'up' : 'down') as 'up' | 'down',
     };
-  }, [state.lockedNodeByPoet, primaryPoet, mp, transform, size, popupDrag]);
+  }, [yearState.lockedNodeByPoet, primaryPoet, mp, transform, size, popupDrag]);
 
   /** 迭代 13：浮层拖拽起点（由 MapWorkPopup 的 header onPointerDown 触发） */
   const onPopupDragStart = useCallback(
@@ -1004,12 +1005,12 @@ export default function MapCanvas(): JSX.Element {
   /** 迭代 13：切换节点时重置拖拽位置（让浮层回到新节点的投影位置） */
   const prevLockedId = useRef<string | null>(null);
   useEffect(() => {
-    const lockedId = state.lockedNodeByPoet[primaryPoet.id];
+    const lockedId = yearState.lockedNodeByPoet[primaryPoet.id];
     if (lockedId !== prevLockedId.current) {
       prevLockedId.current = lockedId;
       setPopupDrag(null);
     }
-  }, [state.lockedNodeByPoet, primaryPoet.id]);
+  }, [yearState.lockedNodeByPoet, primaryPoet.id]);
 
   /** 节点点击：定位 + 平滑飞行 + 右面板自动展开该地最新作品（迭代 1 · A.1 / B.2） */
   const onPickNode = useCallback(
@@ -1051,10 +1052,10 @@ export default function MapCanvas(): JSX.Element {
   const followTarget = useMemo(() => {
     if (!state.playing || !state.followPlay) return undefined;
     const main = primaryPoet;
-    const i = activeNodeIndex(main.nodes, yearOf(state, main.id));
+    const i = activeNodeIndex(main.nodes, yearOf(yearState, main.id));
     const n: LifeNode | undefined = main.nodes[i];
     return n ? { id: n.id, lng: n.lng, lat: n.lat } : undefined;
-  }, [state, primaryPoet]);
+  }, [state, primaryPoet, yearState]);
 
   /**
    * 迭代 4 · 播放自动跟随：
@@ -1094,8 +1095,8 @@ export default function MapCanvas(): JSX.Element {
   );
 
   const years = useMemo(
-    () => visiblePoets.map((p) => yearOf(state, p.id)),
-    [visiblePoets, state],
+    () => visiblePoets.map((p) => yearOf(yearState, p.id)),
+    [visiblePoets, state, yearState],
   );
 
   /** 悬停预览 tooltip 内容（迭代 1 · A.2）：诗人 · 年份 · 古称（今地） · 该地作品数 */
@@ -1184,7 +1185,7 @@ export default function MapCanvas(): JSX.Element {
           left={popup.left}
           top={popup.top}
           placement={popup.placement}
-          year={yearOf(state, primaryPoet.id)}
+          year={yearOf(yearState, primaryPoet.id)}
           hasPrev={popup.index > 0}
           hasNext={popup.index < primaryPoet.nodes.length - 1}
           onClose={() => dispatch({ type: 'CLEAR_NODE', poetId: primaryPoet.id })}

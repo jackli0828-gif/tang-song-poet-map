@@ -5616,12 +5616,16 @@ export const POET_MAP: Record<string, Poet> = POETS.reduce(
  *     （业务代码更新时不必重下）。
  *
  * 正确性要点：
- *   1. applyWorksAdd / applyWorkPlink 是原地改写 POETS 的副作用函数，
- *      对象身份不变会让依赖 [primaryPoet] 的 useMemo 不重算 → 因此并入后
- *      必须刷新一批「新身份」（见 refreshIdentities），让 React 自然重算。
+ *   1. applyWorksAdd / applyWorkPlink 是原地改写 POETS 的副作用函数，对象身份不变，
+ *      依赖 [primaryPoet] 的 useMemo 不会重算。解法是**保持对象身份不变**，
+ *      由 App 在并入完成后 dataVersion+1，用 key 重挂载数据子树（见 App.tsx）。
+ *      早期试过「重建 474 位诗人对象身份 + useSyncExternalStore 通知」，
+ *      结果 React 重挂载时读到失效引用，整站白屏 —— 不要改回那条路。
  *   2. 索引（ALL_WORKS / 节点数）原先在模块加载时一次性算好，现在必须
  *      延迟到首次访问才建，并在补充并入后重建，否则顶栏统计会停在旧值。
  *   3. 用版本号 + 订阅通知 useSyncExternalStore，驱动已挂载组件重渲染。
+ *   4. 加载失败时必须清掉 loadingPromise 缓存，否则重试永远拿到同一个已拒绝的
+ *      promise（见 loadSupplements 的 catch 分支）。
  * ================================================================== */
 
 let supplementLoaded = false;
@@ -5650,17 +5654,24 @@ export function isSupplementLoaded(): boolean {
 export function loadSupplements(): Promise<void> {
   if (loadingPromise) return loadingPromise;
   loadingPromise = (async () => {
-    const [{ applyWorksAdd }, { applyWorkPlink }] = await Promise.all([
-      import('./works-add'),
-      import('./work-plink'),
-    ]);
-    WORKS_ADD_COUNT = applyWorksAdd(POETS);
-    WORK_PLINK_COUNT = applyWorkPlink(POETS);
-    buildIndex(); // 重建索引，避免统计停留在补充前
-    supplementLoaded = true;
-    supplementVersion += 1;
-    // 通知订阅者（App 据此重挂载数据子树，让新并入的作品进入界面）
-    supplementListeners.forEach((cb) => cb());
+    try {
+      const [{ applyWorksAdd }, { applyWorkPlink }] = await Promise.all([
+        import('./works-add'),
+        import('./work-plink'),
+      ]);
+      WORKS_ADD_COUNT = applyWorksAdd(POETS);
+      WORK_PLINK_COUNT = applyWorkPlink(POETS);
+      buildIndex(); // 重建索引，避免统计停留在补充前
+      supplementLoaded = true;
+      supplementVersion += 1;
+      // 通知订阅者（App 据此重挂载数据子树，让新并入的作品进入界面）
+      supplementListeners.forEach((cb) => cb());
+    } catch (e) {
+      // 关键：失败后必须清掉缓存的 promise，否则后续重试拿到的永远是同一个
+      // 已拒绝的 promise，重试按钮会变成死按钮。
+      loadingPromise = null;
+      throw e;
+    }
   })();
   return loadingPromise;
 }
@@ -5677,6 +5688,8 @@ export interface WorkRef {
 
 let allWorksCache: WorkRef[] | null = null;
 let nodesCache = -1;
+let tangCountCache = -1;
+let songCountCache = -1;
 
 /**
  * 构建 / 重建作品与节点索引。
@@ -5698,6 +5711,16 @@ function buildIndex(): void {
     ),
   ).sort((a, b) => a.year - b.year);
   nodesCache = POETS.reduce((s, p) => s + p.nodes.length, 0);
+  // 朝代计数一并算好：DATA_STATS 的 getter 在渲染期间会被反复读取，
+  // 每次都 filter 一遍 474 项是白费（原先就是这么写的）。
+  let tang = 0;
+  let song = 0;
+  for (const p of POETS) {
+    if (p.dynasty === '唐') tang += 1;
+    else if (p.dynasty === '宋') song += 1;
+  }
+  tangCountCache = tang;
+  songCountCache = song;
 }
 
 function ensureIndex(): void {
@@ -5717,8 +5740,8 @@ export function getAllWorks(): WorkRef[] {
  *  入产物（esbuild 的校验脚本不做 tree-shake，因此看不出来）。 */
 export const DATA_STATS = {
   get poets(): number { return POETS.length; },
-  get tang(): number { return POETS.filter((p) => p.dynasty === '唐').length; },
-  get song(): number { return POETS.filter((p) => p.dynasty === '宋').length; },
+  get tang(): number { ensureIndex(); return tangCountCache; },
+  get song(): number { ensureIndex(); return songCountCache; },
   get nodes(): number { ensureIndex(); return nodesCache; },
   get works(): number { ensureIndex(); return (allWorksCache as WorkRef[]).length; },
   get worksAdd(): number { return WORKS_ADD_COUNT; },

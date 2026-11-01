@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { useApp, useAppDispatch, useAppState, yearOf } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useYearState, yearOf } from '../store/PoetContext';
 import { citiesOfDynasty } from '../data/cities';
 import { EVENT_COLOR, EVENT_LABEL, type LifeNode, type Poet, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
@@ -115,10 +115,11 @@ function PoetNowBlock({ poet, node, year }: { poet: Poet; node: LifeNode | undef
 /** 右侧作品详情面板：人—时—地—作品 联动 */
 export default function WorkPanel(): JSX.Element {
   const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   const { primaryPoet, selectedPoets, compareMode } = useApp();
 
-  const year = yearOf(state, primaryPoet.id);
+  const year = yearOf(yearState, primaryPoet.id);
   // 播放过程中 year 是浮点（用于轨迹平滑插值），展示位一律取整
   const shownYear = Math.round(year);
   const idx = activeNodeIndex(primaryPoet.nodes, year);
@@ -308,7 +309,7 @@ export default function WorkPanel(): JSX.Element {
             </h3>
             <div className="space-y-2">
               {others.map((p) => {
-                const y = yearOf(state, p.id);
+                const y = yearOf(yearState, p.id);
                 const i = activeNodeIndex(p.nodes, y);
                 return <PoetNowBlock key={p.id} poet={p} node={p.nodes[i]} year={y} />;
               })}

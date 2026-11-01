@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useApp, useAppDispatch, useAppState } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useYearState } from '../store/PoetContext';
 import { EVENT_LABEL, type LifeNode, type Work } from '../types';
 import { ageAt, formatEra } from '../utils/format';
 import { useSpeechState } from '../hooks/useSpeech';
@@ -13,6 +13,7 @@ interface Row {
 /** 作品总览（作品墙）：按时间倒序列出全部作品，点击可反向定位回地图节点（迭代 1 · B.1） */
 export default function WorksGallery(): JSX.Element {
   const state = useAppState();
+  const yearState = useYearState();
   const dispatch = useAppDispatch();
   const { primaryPoet } = useApp();
   // 迭代 12：作品朗读（与地图浮层、时间轴「朗读生平」共用同一个语音单例）
@@ -128,7 +129,7 @@ export default function WorksGallery(): JSX.Element {
               const expanded = state.expandedWorkIds.includes(row.work.id);
               // 迭代 1 · B.2：播放到该作品所属节点时会自动展开（expanded 即亮），
               // 这里再高亮「当前正在这一地创作」的作品
-              const isCurrentNode = state.lockedNodeByPoet[primaryPoet.id] === row.node.id;
+              const isCurrentNode = yearState.lockedNodeByPoet[primaryPoet.id] === row.node.id;
               return (
                 <li key={row.work.id}>
                   {/* 注意：<button> 只允许 phrasing content，卡片内包含标题、正文与独立交互控件，

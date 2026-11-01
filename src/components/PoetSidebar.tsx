@@ -1,5 +1,5 @@
 import React from 'react';
-import { useApp, useAppDispatch, useAppState, useFilteredPoets, yearOf } from '../store/PoetContext';
+import { useApp, useAppDispatch, useAppState, useFilteredPoets } from '../store/PoetContext';
 import { DATA_STATS } from '../data/poets';
 import { activeNodeIndex } from '../utils/geo';
 

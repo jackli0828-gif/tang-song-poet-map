@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useMemo, useReducer, type Dispatch, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useReducer,
+  useRef,
+  type Dispatch,
+  type ReactNode,
+} from 'react';
 import { POETS, POET_MAP } from '../data/poets';
 import type { EraKey, PanelView, PlaySpeed, Poet } from '../types';
 import { activeNodeIndex } from '../utils/geo';
@@ -147,8 +155,8 @@ export const initialState: AppState = {
   sidebarDrawerOpen: false,
 };
 
-/** 依据诗人 id 取当前年份（回退到出生年） */
-export function yearOf(state: AppState, poetId: string): number {
+/** 依据诗人 id 取当前年份（回退到出生年）。接收年份切片即可，无需完整 state */
+export function yearOf(state: { yearByPoet: Record<string, number> }, poetId: string): number {
   const poet = POET_MAP[poetId];
   if (!poet) return 0;
   const y = state.yearByPoet[poetId];
@@ -392,21 +400,96 @@ function reducer(state: AppState, action: AppAction): AppState {
   }
 }
 
-const StateContext = createContext<AppState>(initialState);
+/* ==================================================================
+ * 迭代 18 · 状态切片：把「播放中每帧都变」的年份字段拆出主状态 context
+ * ==================================================================
+ * 问题：时间轴播放时 useTimelinePlayer 每帧 dispatch SET_YEAR，reducer 返回
+ * 新的 state 对象 → StateContext 变化 → **13 个消费组件全部重渲染**，
+ * 其中 PoetSidebar 每次都要重渲染 474 行名录（它只用 primaryId / selectedIds，
+ * 跟年份毫无关系）。播放时帧预算被白白吃掉一大半。
+ *
+ * 解法：同一份 reducer state，拆成两个 context 提供 ——
+ *   · YearContext  —— 只装 yearByPoet / lockedNodeByPoet（高频）
+ *   · StateContext —— 其余字段（低频），用浅比较保持引用稳定，
+ *                     年份变化时引用不变，消费方不会重渲染
+ * 需要年份的组件显式调用 useYearState()，范围从 13 个收敛到 6 个。
+ * ================================================================== */
+
+/** 高频切片：年份与手动锁定的节点 */
+export interface YearSlice {
+  yearByPoet: Record<string, number>;
+  lockedNodeByPoet: Record<string, string | null>;
+}
+
+/** 低频切片：除年份外的其余状态 */
+export type RestState = Omit<AppState, 'yearByPoet' | 'lockedNodeByPoet'>;
+
+/** 从完整 state 中剥离高频字段 */
+function restOf(state: AppState): RestState {
+  const { yearByPoet: _yearByPoet, lockedNodeByPoet: _lockedNodeByPoet, ...rest } = state;
+  return rest;
+}
+
+/**
+ * 浅比较稳定化：内容逐字段相同时返回上一次的对象引用。
+ * 用于让 StateContext 的 value 在「只有年份变化」时保持同一引用。
+ */
+function useShallowStable<T extends object>(next: T): T {
+  const ref = useRef<T>(next);
+  const prev = ref.current;
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(next);
+  let same = prevKeys.length === nextKeys.length;
+  if (same) {
+    for (const k of nextKeys) {
+      if ((prev as Record<string, unknown>)[k] !== (next as Record<string, unknown>)[k]) {
+        same = false;
+        break;
+      }
+    }
+  }
+  if (!same) ref.current = next;
+  return ref.current;
+}
+
+const StateContext = createContext<RestState>(restOf(initialState));
+const YearContext = createContext<YearSlice>({
+  yearByPoet: initialState.yearByPoet,
+  lockedNodeByPoet: initialState.lockedNodeByPoet,
+});
 const DispatchContext = createContext<Dispatch<AppAction>>(() => undefined);
 
 export function AppProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  const yearSlice = useMemo<YearSlice>(
+    () => ({
+      yearByPoet: state.yearByPoet,
+      lockedNodeByPoet: state.lockedNodeByPoet,
+    }),
+    [state.yearByPoet, state.lockedNodeByPoet],
+  );
+
+  // 只有年份变化时，restState 保持原引用 → 非年份消费方不重渲染
+  const restState = useShallowStable(restOf(state));
+
   return (
-    <StateContext.Provider value={state}>
-      <DispatchContext.Provider value={dispatch}>{children}</DispatchContext.Provider>
-    </StateContext.Provider>
+    <DispatchContext.Provider value={dispatch}>
+      <YearContext.Provider value={yearSlice}>
+        <StateContext.Provider value={restState}>{children}</StateContext.Provider>
+      </YearContext.Provider>
+    </DispatchContext.Provider>
   );
 }
 
-/** 读取应用状态 */
-export function useAppState(): AppState {
+/** 读取应用状态（不含年份；需要年份请用 useYearState） */
+export function useAppState(): RestState {
   return useContext(StateContext);
+}
+
+/** 读取年份切片（播放时每帧变化，仅真正需要年份的组件调用） */
+export function useYearState(): YearSlice {
+  return useContext(YearContext);
 }
 
 /** 读取 dispatch（不会因状态变化而重渲染） */
@@ -419,11 +502,10 @@ export interface AppDerived {
   primaryPoet: Poet;
   selectedPoets: Poet[];
   compareMode: boolean;
-  currentYear: number;
 }
 
-/** 组合后的派生数据（主诗人、对比模式、当前年份等） */
-export function useApp(): AppDerived & { state: AppState; dispatch: Dispatch<AppAction> } {
+/** 组合后的派生数据（主诗人、对比模式等；不含年份） */
+export function useApp(): AppDerived & { state: RestState; dispatch: Dispatch<AppAction> } {
   const state = useAppState();
   const dispatch = useAppDispatch();
   const selectedPoets = useMemo(
@@ -431,7 +513,6 @@ export function useApp(): AppDerived & { state: AppState; dispatch: Dispatch<App
     [state.selectedIds],
   );
   const primaryPoet = POET_MAP[state.primaryId] ?? POETS[0];
-  const currentYear = yearOf(state, primaryPoet.id);
   return {
     state,
     dispatch,
@@ -439,7 +520,6 @@ export function useApp(): AppDerived & { state: AppState; dispatch: Dispatch<App
     primaryPoet,
     selectedPoets,
     compareMode: selectedPoets.length > 1,
-    currentYear,
   };
 }
 
